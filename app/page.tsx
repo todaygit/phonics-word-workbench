@@ -26,6 +26,17 @@ import {
   Volume2,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -72,7 +83,6 @@ type Settings = {
   newPerDay: number;
   reviewPerDay: number;
   strategy: ReviewStrategy;
-  spellingRound: boolean;
   autoSpeak: boolean;
 };
 
@@ -82,7 +92,6 @@ const DEFAULT_SETTINGS: Settings = {
   newPerDay: 6,
   reviewPerDay: 12,
   strategy: 'spaced',
-  spellingRound: true,
   autoSpeak: false,
 };
 
@@ -150,6 +159,7 @@ export default function Home() {
   const [sessionIndex, setSessionIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
   const [completed, setCompleted] = useState(0);
+  const [dailyGoal, setDailyGoal] = useState(0);
   const [query, setQuery] = useState('');
   const [groupFilter, setGroupFilter] = useState('all');
   const [editingWord, setEditingWord] = useState<Word | null>(null);
@@ -161,6 +171,7 @@ export default function Home() {
     setWords(loadStored('phonics.words', seedWords));
     setSettings(loadStored('phonics.settings', DEFAULT_SETTINGS));
     setCompleted(loadStored(`phonics.completed.${todayKey()}`, 0));
+    setDailyGoal(loadStored(`phonics.goal.${todayKey()}`, 0));
     setHydrated(true);
   }, []);
 
@@ -176,6 +187,10 @@ export default function Home() {
     if (hydrated) window.localStorage.setItem(`phonics.completed.${todayKey()}`, JSON.stringify(completed));
   }, [completed, hydrated]);
 
+  useEffect(() => {
+    if (hydrated) window.localStorage.setItem(`phonics.goal.${todayKey()}`, JSON.stringify(dailyGoal));
+  }, [dailyGoal, hydrated]);
+
   const dueWords = useMemo(
     () => words.filter((word) => word.active && word.status !== 'new' && word.nextReview <= todayKey()),
     [words],
@@ -185,6 +200,7 @@ export default function Home() {
     [words],
   );
   const todayTotal = Math.min(dueWords.length, settings.reviewPerDay) + Math.min(newWords.length, settings.newPerDay);
+  const displayGoal = dailyGoal || todayTotal;
   const focusGroups = useMemo(() => {
     const candidates = [...dueWords, ...newWords].slice(0, 8);
     const counts = new Map<string, number>();
@@ -228,7 +244,9 @@ export default function Home() {
     const afterPaint = () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
     const register = (tool: WebTool) => {
       try {
-        void Promise.resolve(context.registerTool(tool, { signal: lifecycle.signal })).catch(console.warn);
+        void Promise.resolve(context.registerTool(tool, { signal: lifecycle.signal })).catch((error) => {
+          if (!(error instanceof DOMException && error.name === 'AbortError')) console.warn(error);
+        });
       } catch (error) {
         console.warn(error);
       }
@@ -341,6 +359,7 @@ export default function Home() {
     const queue = settings.strategy === 'mixed'
       ? reviews.flatMap((word, index) => fresh[index] ? [word, fresh[index]] : [word]).concat(fresh.slice(reviews.length))
       : [...reviews, ...fresh];
+    setDailyGoal((value) => Math.max(value, completed + queue.length));
     setSession(queue);
     setSessionIndex(0);
     setRevealed(false);
@@ -472,7 +491,7 @@ export default function Home() {
             <Volume2 />
           </button>
           <h1 className={settings.strategy === 'sound-first' && !revealed ? 'word-hidden' : ''}>{currentWord?.word}</h1>
-          <p className="phonics-line">{currentWord?.phonics}</p>
+          <p className={`phonics-line ${settings.strategy === 'sound-first' && !revealed ? 'word-hidden' : ''}`}>{currentWord?.phonics}</p>
           {!revealed ? (
             <Button className="reveal-button" size="lg" onClick={() => setRevealed(true)}><CircleHelp /> 看意思与例句</Button>
           ) : (
@@ -502,7 +521,7 @@ export default function Home() {
         </div>
         <div className="header-status">
           <span className="date-label">{weekday}</span>
-          <div className="streak"><Flame /> <strong>7</strong><span>天连续</span></div>
+          <div className="streak"><Flame /> <strong>{completed}</strong><span>/ {displayGoal || 0} 今日</span></div>
         </div>
       </header>
 
@@ -523,9 +542,9 @@ export default function Home() {
                 <Play fill="currentColor" /> {completed ? '继续今天的学习' : '开始今天的学习'}
               </Button>
             </div>
-            <div className="progress-orbit" aria-label={`今日完成 ${completed}，计划 ${todayTotal}`}>
-              <div className="orbit-ring" style={{ '--progress': `${Math.min(100, todayTotal ? (completed / todayTotal) * 100 : 0) * 3.6}deg` } as React.CSSProperties}>
-                <div><strong>{completed}</strong><span>/ {todayTotal}</span><small>今日完成</small></div>
+            <div className="progress-orbit" aria-label={`今日完成 ${completed}，计划 ${displayGoal}`}>
+              <div className="orbit-ring" style={{ '--progress': `${Math.min(100, displayGoal ? (completed / displayGoal) * 100 : 0) * 3.6}deg` } as React.CSSProperties}>
+                <div><strong>{completed}</strong><span>/ {displayGoal}</span><small>今日完成</small></div>
               </div>
               <span className="orbit-dot dot-one">sh</span>
               <span className="orbit-dot dot-two">ee</span>
@@ -603,7 +622,13 @@ export default function Home() {
                 <span><Switch checked={word.active} onCheckedChange={(checked) => setWords((items) => items.map((item) => item.id === word.id ? { ...item, active: Boolean(checked) } : item))} aria-label={`${word.word}是否启用`} /></span>
                 <span className="row-actions">
                   <Button size="icon-sm" variant="ghost" aria-label={`编辑${word.word}`} onClick={() => setEditingWord(word)}><Pencil /></Button>
-                  <Button size="icon-sm" variant="ghost" aria-label={`删除${word.word}`} onClick={() => setWords((items) => items.filter((item) => item.id !== word.id))}><Trash2 /></Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger render={<Button size="icon-sm" variant="ghost" aria-label={`删除${word.word}`} />}><Trash2 /></AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader><AlertDialogTitle>从词库删除“{word.word}”？</AlertDialogTitle><AlertDialogDescription>这个单词的学习记录也会一起删除。若之前做过备份，可以从备份文件恢复。</AlertDialogDescription></AlertDialogHeader>
+                      <AlertDialogFooter><AlertDialogCancel>保留</AlertDialogCancel><AlertDialogAction variant="destructive" onClick={() => setWords((items) => items.filter((item) => item.id !== word.id))}>删除</AlertDialogAction></AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </span>
               </div>
             ))}
@@ -636,10 +661,6 @@ export default function Home() {
                 <SelectTrigger className="strategy-select"><SelectValue /></SelectTrigger>
                 <SelectContent><SelectItem value="spaced">间隔复习 · 先复习后新词</SelectItem><SelectItem value="mixed">新旧混合 · 交替出现</SelectItem><SelectItem value="sound-first">先听后认 · 先隐藏拼写</SelectItem></SelectContent>
               </Select>
-            </section>
-            <section className="settings-card toggle-card">
-              <div><h2>加入拼写轮次</h2><p>熟悉后增加“听音拼写”提示</p></div>
-              <Switch checked={settings.spellingRound} onCheckedChange={(checked) => setSettings((item) => ({ ...item, spellingRound: Boolean(checked) }))} aria-label="加入拼写轮次" />
             </section>
             <section className="settings-card toggle-card">
               <div><h2>自动朗读</h2><p>进入每张单词卡时自动读一遍</p></div>
