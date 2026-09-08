@@ -95,11 +95,20 @@ const model = await import(
 const learning = await import(
   await moduleUrl(resolve(root, 'app/learning-model.ts'))
 );
+const parentLock = await import(
+  await moduleUrl(resolve(root, 'app/parent-lock.ts'))
+);
 const activity = await import(
   await moduleUrl(resolve(root, 'app/api/activity/route.ts'))
 );
 const answers = await import(
   await moduleUrl(resolve(root, 'app/api/learning/answer/route.ts'))
+);
+const checkIn = await import(
+  await moduleUrl(resolve(root, 'app/api/activity/check-in/route.ts'))
+);
+const forest = await import(
+  await moduleUrl(resolve(root, 'app/api/forest/route.ts'))
 );
 const learningRoute = await import(
   await moduleUrl(resolve(root, 'app/api/learning/route.ts'))
@@ -162,8 +171,14 @@ try {
       totalPoints: 0,
       startedOn: null,
       todayPoints: 0,
+      checkedInToday: false,
     });
     assert.equal(model.rate(0, 0), '—');
+  });
+  await test('parent settings accept only the requested four-digit PIN', async () => {
+    assert.equal(parentLock.validParentPin('1111'), true);
+    for (const value of ['111', '01111', '1112', '', ' 1111 '])
+      assert.equal(parentLock.validParentPin(value), false);
   });
   await test('API requires identity, rejects cross-origin writes and invalid dates', async () => {
     assert.equal(
@@ -366,6 +381,57 @@ try {
       1,
     );
     assert.equal((await report('year', '', 'child-a')).totalPoints, 6);
+  });
+  await test('daily login awards exactly once per China day', async () => {
+    const request = () => req('/api/activity/check-in', {}, 'child-c');
+    let response = await checkIn.POST(request());
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).points, 1);
+    response = await checkIn.POST(request());
+    assert.equal((await response.json()).points, 1);
+    const data = await report('year', '', 'child-c');
+    assert.equal(data.totalPoints, 1);
+    assert.equal(data.checkedInToday, true);
+  });
+  await test('tree catalog spans 5 to 500 points', async () => {
+    assert.equal(model.TREE_CATALOG.length, 10);
+    assert.equal(Math.min(...model.TREE_CATALOG.map((tree) => tree.cost)), 5);
+    assert.equal(Math.max(...model.TREE_CATALOG.map((tree) => tree.cost)), 500);
+    assert.equal(new Set(model.TREE_CATALOG.map((tree) => tree.id)).size, 10);
+  });
+  await test('planting spends available points and request retry is idempotent', async () => {
+    for (let i = 0; i < 4; i++) await postSpell(spell(`seed ${i}`), 'child-c');
+    const requestId = crypto.randomUUID();
+    const body = { treeId: 'sprout', requestId };
+    const plantRequest = () => req('/api/forest', body, 'child-c');
+    let response = await forest.POST(plantRequest());
+    assert.equal(response.status, 200);
+    let data = await response.json();
+    assert.equal(data.available, 0);
+    assert.equal(data.planted.length, 1);
+    response = await forest.POST(plantRequest());
+    assert.equal(response.status, 200);
+    data = await response.json();
+    assert.equal(data.planted.length, 1);
+    assert.equal(data.available, 0);
+  });
+  await test('cannot plant an unaffordable or unknown tree', async () => {
+    let response = await forest.POST(
+      req(
+        '/api/forest',
+        { treeId: 'wonder', requestId: crypto.randomUUID() },
+        'child-c',
+      ),
+    );
+    assert.equal(response.status, 409);
+    response = await forest.POST(
+      req(
+        '/api/forest',
+        { treeId: 'not-real', requestId: crypto.randomUUID() },
+        'child-c',
+      ),
+    );
+    assert.equal(response.status, 400);
   });
   await test('tree boundaries 99, 100, 101, 199 and 200 are stable', async () => {
     for (const n of [0, 99, 100, 101, 199, 200]) {

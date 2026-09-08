@@ -1,14 +1,7 @@
 'use client';
 /* oxlint-disable react/react-compiler, jsx-a11y/label-has-associated-control */
 import { useEffect, useState } from 'react';
-import {
-  Sprout,
-  TreePine,
-  TreeDeciduous,
-  CircleDot,
-  Coins,
-  RefreshCw,
-} from 'lucide-react';
+import { Sprout, TreeDeciduous, Coins, RefreshCw, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
@@ -24,11 +17,11 @@ import {
 import {
   chinaDay,
   rate,
-  treeProgress,
   sumRows,
   reportPeriods,
   type ActivityMode,
   type ActivityReport,
+  TREE_CATALOG,
 } from './activity-model';
 
 function useReport(mode: ActivityMode, period: string) {
@@ -78,24 +71,93 @@ function ReportStatus({
   );
 }
 
+type Forest = {
+  earned: number;
+  spent: number;
+  available: number;
+  todayPoints: number;
+  checkedInToday: boolean;
+  planted: {
+    id: string;
+    treeId: string;
+    treeName: string;
+    cost: number;
+    plantedAt: number;
+  }[];
+};
+function useForest() {
+  const [forest, setForest] = useState<Forest | null>(null);
+  const [error, setError] = useState('');
+  const [retry, setRetry] = useState(0);
+  useEffect(() => {
+    let active = true;
+    setForest(null);
+    setError('');
+    void (async () => {
+      const checkIn = await fetch('/api/activity/check-in', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      if (!checkIn.ok && checkIn.status !== 401)
+        throw new Error('今日登录积分暂时未领取。');
+      const response = await fetch('/api/forest', { cache: 'no-store' });
+      const data = (await response.json()) as Forest & { error?: string };
+      if (!response.ok) throw new Error(data.error || '暂时无法读取成长森林。');
+      if (active) setForest(data);
+    })().catch((reason) => {
+      if (active)
+        setError(reason instanceof Error ? reason.message : '读取失败');
+    });
+    return () => {
+      active = false;
+    };
+  }, [retry]);
+  return { forest, error, reload: () => setRetry((n) => n + 1) };
+}
+
 export function RewardsView() {
-  const { report, error, reload } = useReport('month', chinaDay().slice(0, 4));
-  if (!report)
+  const { forest, error, reload } = useForest();
+  const [selected, setSelected] = useState(TREE_CATALOG[0].id);
+  const [planting, setPlanting] = useState(false);
+  const [message, setMessage] = useState('');
+  const [requestId, setRequestId] = useState('');
+  if (!forest)
     return (
       <section className="learning-view">
         <h1>积分种树</h1>
         <ReportStatus error={error} reload={reload} />
       </section>
     );
-  const tree = treeProgress(report.totalPoints);
-  const GrowthIcon =
-    tree.growth < 10
-      ? CircleDot
-      : tree.growth < 35
-        ? Sprout
-        : tree.growth < 70
-          ? TreePine
-          : TreeDeciduous;
+  const target =
+    TREE_CATALOG.find((tree) => tree.id === selected) ?? TREE_CATALOG[0];
+  const progress = Math.min(100, (forest.available / target.cost) * 100);
+  async function plant() {
+    if (planting || progress < 100) return;
+    setPlanting(true);
+    setMessage('');
+    const receipt = requestId || crypto.randomUUID();
+    setRequestId(receipt);
+    try {
+      const response = await fetch('/api/forest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ treeId: target.id, requestId: receipt }),
+      });
+      const body = (await response.json()) as Forest & { error?: string };
+      if (!response.ok)
+        throw new Error(body.error || '这棵树暂时没有种下，请重试。');
+      setRequestId('');
+      setMessage(`${target.name}种好啦！它已经住进你的小树林。`);
+      reload();
+    } catch (reason) {
+      setMessage(
+        reason instanceof Error ? reason.message : '种树失败，请重试。',
+      );
+    } finally {
+      setPlanting(false);
+    }
+  }
   return (
     <section className="learning-view reward-view">
       <div className="report-heading">
@@ -107,64 +169,121 @@ export function RewardsView() {
           <RefreshCw /> 刷新
         </Button>
       </div>
+      <div className="reward-totals reward-wallet">
+        <div>
+          <Coins />
+          <strong>{forest.available}</strong>
+          <span>可用积分</span>
+        </div>
+        <div>
+          <Sprout />
+          <strong>+{forest.todayPoints}</strong>
+          <span>今日获得</span>
+        </div>
+        <div>
+          <TreeDeciduous />
+          <strong>{forest.planted.length}</strong>
+          <span>已种树木</span>
+        </div>
+        <div>
+          <Check />
+          <strong>{forest.checkedInToday ? '+1' : '—'}</strong>
+          <span>今日登录</span>
+        </div>
+      </div>
+      <div className="tree-shop-heading">
+        <div>
+          <h2>选择下一棵树</h2>
+          <p>积分越多，可以选择的树越特别。点选一棵作为目标。</p>
+        </div>
+        <span>
+          累计获得 {forest.earned} 分 · 已用于种树 {forest.spent} 分
+        </span>
+      </div>
+      <div className="tree-catalog">
+        {TREE_CATALOG.map((tree) => (
+          <button
+            key={tree.id}
+            type="button"
+            onClick={() => {
+              setSelected(tree.id);
+              setRequestId('');
+              setMessage('');
+            }}
+            className={`tree-choice tree-${tree.color} ${selected === tree.id ? 'selected' : ''}`}
+            aria-pressed={selected === tree.id}
+          >
+            <span className="tree-symbol" aria-hidden="true">
+              {tree.symbol}
+            </span>
+            <strong>{tree.name}</strong>
+            <small>{tree.note}</small>
+            <b>{tree.cost} 积分</b>
+            {selected === tree.id && (
+              <Check className="tree-selected" aria-label="已选择" />
+            )}
+          </button>
+        ))}
+      </div>
       <div className="reward-layout">
-        <article className="growth-panel">
-          <span className="growth-stage">
-            第 {tree.trees + 1} 棵 · {tree.stage}
-          </span>
-          <figure className={`growth-indicator growth-${tree.stage}`}>
-            <GrowthIcon strokeWidth={1.3} aria-hidden="true" />
-            <figcaption className="sr-only">
-              第 {tree.trees + 1} 棵树，{tree.stage}阶段，进度 {tree.growth}%
-            </figcaption>
-          </figure>
-          <h2>
-            {report.totalPoints
-              ? '每一次学会，都让小树成长'
-              : '第一颗种子，等你来照顾'}
-          </h2>
-          <p>
-            再积累 <strong>{tree.remaining}</strong> 分，就能长成一棵大树。
-          </p>
-          <Progress value={tree.growth} aria-label="本棵树成长进度" />
+        <article className={`growth-panel tree-${target.color}`}>
+          <span className="growth-stage">我的目标 · {target.cost} 积分</span>
+          <div className="target-tree-symbol" aria-hidden="true">
+            {target.symbol}
+          </div>
+          <h2>{target.name}</h2>
+          <p>{target.note}</p>
+          <Progress value={progress} aria-label={`${target.name}积分进度`} />
           <div className="growth-progress-label">
-            <span>{tree.growth} / 100 分</span>
-            <span>满 100 分自动种成</span>
+            <span>
+              {forest.available} / {target.cost} 分
+            </span>
+            <span>
+              {forest.available >= target.cost
+                ? '积分够啦，可以种下'
+                : `还差 ${target.cost - forest.available} 分`}
+            </span>
           </div>
-          <div className="growth-milestones">
-            <span>0 · 种子</span>
-            <span>10 · 嫩芽</span>
-            <span>35 · 树苗</span>
-            <span>70 · 小树</span>
-            <span>100 · 成树</span>
-          </div>
+          <Button
+            className="plant-button"
+            disabled={planting || forest.available < target.cost}
+            onClick={() => void plant()}
+          >
+            {planting ? '正在种下…' : `种下${target.name}`}
+          </Button>
+          {message && <output className="plant-message">{message}</output>}
         </article>
         <div className="reward-details">
           <div className="reward-totals">
             <div>
               <Coins />
-              <strong>{report.totalPoints}</strong>
-              <span>累计积分</span>
+              <strong>+1</strong>
+              <span>每天首次登录</span>
             </div>
             <div>
               <Sprout />
-              <strong>+{report.todayPoints}</strong>
-              <span>今日积分</span>
+              <strong>+1</strong>
+              <span>每个学会的词</span>
             </div>
             <div>
               <TreeDeciduous />
-              <strong>{tree.trees}</strong>
-              <span>已种成的树</span>
+              <strong>+1</strong>
+              <span>每道答对的题</span>
             </div>
           </div>
           <article className="panel reward-rules">
             <h2>小树怎么长大？</h2>
-            <p>认识一个词、拼对一个词，或答对一道语法题，可以获得 1 分。</p>
+            <p>
+              每天第一次打开工作台自动领取 1
+              分；认识一个词、拼对一个词，或答对一道语法题，也可以获得 1 分。
+            </p>
             <p>
               同一天，同一个词或题在同一模块里最多得 1
               分。第一次不会，练习后答对也能得分。
             </p>
-            <p>答错不扣分，不学习也不会让树枯萎。明天复习，还可以再得分。</p>
+            <p>
+              答错不扣分。选择喜欢的树，积分达到要求后再种下；种树会使用对应积分，已经种好的树永远留在小树林。
+            </p>
             <small>这是工作台里的虚拟种树，不涉及真实植树或付费奖励。</small>
           </article>
         </div>
@@ -173,16 +292,29 @@ export function RewardsView() {
         <div>
           <h2>我的小树林</h2>
           <p>
-            {tree.trees
-              ? `已经种成 ${tree.trees} 棵树，继续照顾下一棵吧。`
+            {forest.planted.length
+              ? `已经种成 ${forest.planted.length} 棵树，继续选择下一棵吧。`
               : '第一棵树长成后，会留在这里。'}
           </p>
         </div>
-        <div className="forest-icons" aria-label={`已种成 ${tree.trees} 棵树`}>
-          {Array.from({ length: Math.min(tree.trees, 24) }, (_, i) => (
-            <TreeDeciduous key={i} aria-hidden="true" />
-          ))}
-          {tree.trees > 24 && <span>共 {tree.trees} 棵</span>}
+        <div
+          className="forest-icons"
+          aria-label={`已种成 ${forest.planted.length} 棵树`}
+        >
+          {forest.planted.map((planted) => {
+            const species = TREE_CATALOG.find(
+              (tree) => tree.id === planted.treeId,
+            );
+            return (
+              <div
+                className={`forest-tree tree-${species?.color ?? 'mint'}`}
+                key={planted.id}
+              >
+                <span aria-hidden="true">{species?.symbol ?? '🌳'}</span>
+                <small>{planted.treeName}</small>
+              </div>
+            );
+          })}
         </div>
       </article>
     </section>
@@ -196,6 +328,7 @@ export function StatisticsView() {
   const period = mode === 'day' ? month : year;
   const { report, error, reload } = useReport(mode, period);
   const rows = report?.rows ?? [];
+  const learningRows = rows.filter((row) => row.kind !== 'login');
   const recognition = sumRows(rows.filter((r) => r.kind === 'recognition'));
   const spelling = sumRows(rows.filter((r) => r.kind === 'spelling'));
   const grammar = sumRows(rows.filter((r) => r.kind === 'grammar'));
@@ -279,9 +412,9 @@ export function StatisticsView() {
               <small>答对一次，积累一点成长</small>
             </article>
           </div>
-          {!rows.length && (
+          {!learningRows.length && (
             <div className="notice-banner">
-              这个区间还没有学习记录。完成一次学习后，这里会自动更新。
+              这个区间还没有答题记录。每日登录积分已经单独计入积分栏。
             </div>
           )}
           <div className="panel statistics-table">
@@ -358,7 +491,7 @@ export function StatisticsView() {
             </p>
             <p>
               第一次不会、重学后答对，仍能获得积分，但不会改高当天的首次记住率。月度、年度按题次加权汇总，不直接平均每日百分比。当前区间共作答{' '}
-              {sumRows(rows).attempts} 次（含重学和重复练习）。
+              {sumRows(learningRows).attempts} 次（含重学和重复练习）。
             </p>
             <p>
               按北京时间、服务器收到答案的日期记账。

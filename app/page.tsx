@@ -1,7 +1,7 @@
 'use client';
 /* oxlint-disable react/react-compiler, jsx-a11y/label-has-associated-control */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   BookMarked,
@@ -16,6 +16,7 @@ import {
   Headphones,
   Library,
   ListChecks,
+  LockKeyhole,
   Pencil,
   Play,
   Plus,
@@ -37,6 +38,7 @@ import { useLearning } from './use-learning';
 import { WordAudio } from './word-audio';
 import { RewardsView, StatisticsView } from './activity-views';
 import type { Award } from './activity-model';
+import { validParentPin } from './parent-lock';
 import {
   learningStats,
   validateLearning,
@@ -299,6 +301,13 @@ export default function Home() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [tab, setTab] = useState('today');
   const [parentOpen, setParentOpen] = useState(false);
+  const [settingsUnlocked, setSettingsUnlocked] = useState(false);
+  const [pinOpen, setPinOpen] = useState(false);
+  const [pin, setPin] = useState('');
+  const [pinError, setPinError] = useState('');
+  const [requestedParentTab, setRequestedParentTab] = useState<string | null>(
+    null,
+  );
   const [parentTab, setParentTab] = useState('plan');
   const [hydrated, setHydrated] = useState(false);
   const [sequenceCursor, setSequenceCursor] = useState(0);
@@ -336,6 +345,53 @@ export default function Home() {
   );
   const importRef = useRef<HTMLInputElement>(null);
   const answerRef = useRef<HTMLInputElement>(null);
+
+  const requestSettings = useCallback(
+    (target?: string) => {
+      if (settingsUnlocked) {
+        setTab('settings');
+        setParentOpen(Boolean(target));
+        if (target) setParentTab(target);
+        return;
+      }
+      setRequestedParentTab(target ?? null);
+      setPin('');
+      setPinError('');
+      setPinOpen(true);
+    },
+    [settingsUnlocked],
+  );
+
+  function unlockSettings() {
+    if (!validParentPin(pin)) {
+      setPinError('密码不正确，请重新输入。');
+      setPin('');
+      return;
+    }
+    setSettingsUnlocked(true);
+    setTab('settings');
+    setParentOpen(Boolean(requestedParentTab));
+    if (requestedParentTab) setParentTab(requestedParentTab);
+    setPinOpen(false);
+    setPin('');
+    setPinError('');
+  }
+
+  function leaveSettings(nextTab: string) {
+    if (nextTab !== 'settings') {
+      setSettingsUnlocked(false);
+      setParentOpen(false);
+    }
+    setTab(nextTab);
+  }
+
+  useEffect(() => {
+    void fetch('/api/activity/check-in', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+  }, []);
 
   useEffect(() => {
     const warn = (event: BeforeUnloadEvent) => {
@@ -533,9 +589,7 @@ export default function Home() {
           ...current,
           ...(input as Partial<Settings>),
         }));
-        setTab('settings');
-        setParentOpen(true);
-        setParentTab('plan');
+        requestSettings('plan');
         return { updated: true };
       },
     });
@@ -588,9 +642,7 @@ export default function Home() {
               ) + 1,
           },
         ]);
-        setTab('settings');
-        setParentOpen(true);
-        setParentTab('library');
+        requestSettings('library');
         return { added: addition.word, chapter: chapter.title };
       },
     });
@@ -600,6 +652,7 @@ export default function Home() {
     chapters,
     completedToday,
     currentChapter?.title,
+    requestSettings,
     words.length,
   ]);
 
@@ -1140,10 +1193,11 @@ export default function Home() {
                   <SidebarMenuButton
                     isActive={tab === value}
                     aria-current={tab === value ? 'page' : undefined}
-                    onClick={() => {
-                      setTab(value);
-                      if (value === 'settings') setParentOpen(false);
-                    }}
+                    onClick={() =>
+                      value === 'settings'
+                        ? requestSettings()
+                        : leaveSettings(value)
+                    }
                   >
                     <Icon />
                     <span>{label}</span>
@@ -1241,9 +1295,7 @@ export default function Home() {
             <RecognitionView
               store={learning}
               manage={() => {
-                setTab('settings');
-                setParentOpen(true);
-                setParentTab('recognition-library');
+                requestSettings('recognition-library');
               }}
             />
           )}
@@ -1251,9 +1303,7 @@ export default function Home() {
             <GrammarView
               store={learning}
               manage={() => {
-                setTab('settings');
-                setParentOpen(true);
-                setParentTab('grammar-library');
+                requestSettings('grammar-library');
               }}
             />
           )}
@@ -2175,6 +2225,55 @@ export default function Home() {
               确认加入
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={pinOpen}
+        onOpenChange={(open) => {
+          setPinOpen(open);
+          if (!open) {
+            setPin('');
+            setPinError('');
+          }
+        }}
+      >
+        <DialogContent className="pin-dialog">
+          <DialogHeader>
+            <DialogTitle>
+              <LockKeyhole /> 家长设置已上锁
+            </DialogTitle>
+            <DialogDescription>
+              请输入 4 位家长密码后进入设置。
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              unlockSettings();
+            }}
+          >
+            <label htmlFor="parent-pin">家长密码</label>
+            <Input
+              id="parent-pin"
+              type="password"
+              inputMode="numeric"
+              autoComplete="off"
+              maxLength={4}
+              value={pin}
+              onChange={(event) =>
+                setPin(event.target.value.replace(/\D/g, '').slice(0, 4))
+              }
+            />
+            {pinError && <output className="pin-error">{pinError}</output>}
+            <DialogFooter>
+              <Button type="submit" disabled={pin.length !== 4}>
+                解锁设置
+              </Button>
+            </DialogFooter>
+          </form>
+          <p className="pin-note">
+            这是防止孩子误改设置的家庭密码锁，不用于保护重要账户信息。
+          </p>
         </DialogContent>
       </Dialog>
     </SidebarProvider>

@@ -1,4 +1,4 @@
-export type ActivityKind = 'recognition' | 'spelling' | 'grammar';
+export type ActivityKind = 'recognition' | 'spelling' | 'grammar' | 'login';
 export type ActivityMode = 'day' | 'month' | 'year';
 export type Award = { points: number; correct: boolean; day: string };
 export type ActivityRow = {
@@ -15,7 +15,101 @@ export type ActivityReport = {
   totalPoints: number;
   startedOn: string | null;
   todayPoints: number;
+  checkedInToday: boolean;
 };
+export type TreeSpecies = {
+  id: string;
+  name: string;
+  cost: number;
+  symbol: string;
+  color: string;
+  note: string;
+};
+export const TREE_CATALOG: TreeSpecies[] = [
+  {
+    id: 'sprout',
+    name: '晨露嫩芽',
+    cost: 5,
+    symbol: '🌱',
+    color: 'mint',
+    note: '从一颗小芽开始',
+  },
+  {
+    id: 'apple',
+    name: '红苹果树',
+    cost: 15,
+    symbol: '🍎',
+    color: 'apple',
+    note: '结满红红的小苹果',
+  },
+  {
+    id: 'pine',
+    name: '松果小松',
+    cost: 30,
+    symbol: '🌲',
+    color: 'pine',
+    note: '四季常青的松树',
+  },
+  {
+    id: 'cherry',
+    name: '樱花树',
+    cost: 50,
+    symbol: '🌸',
+    color: 'cherry',
+    note: '开出粉色花朵',
+  },
+  {
+    id: 'palm',
+    name: '海风椰树',
+    cost: 80,
+    symbol: '🌴',
+    color: 'palm',
+    note: '带来暖暖海风',
+  },
+  {
+    id: 'maple',
+    name: '金秋枫树',
+    cost: 120,
+    symbol: '🍁',
+    color: 'maple',
+    note: '有金红色的叶子',
+  },
+  {
+    id: 'rainbow',
+    name: '彩虹树',
+    cost: 180,
+    symbol: '🌈',
+    color: 'rainbow',
+    note: '雨后出现七彩光芒',
+  },
+  {
+    id: 'star',
+    name: '星光树',
+    cost: 250,
+    symbol: '✨',
+    color: 'star',
+    note: '夜里闪着小星星',
+  },
+  {
+    id: 'moon',
+    name: '月亮古树',
+    cost: 350,
+    symbol: '🌙',
+    color: 'moon',
+    note: '守护安静的月夜',
+  },
+  {
+    id: 'wonder',
+    name: '奇迹生命树',
+    cost: 500,
+    symbol: '🌳',
+    color: 'wonder',
+    note: '森林里最珍贵的大树',
+  },
+];
+export function treeSpecies(id: string) {
+  return TREE_CATALOG.find((tree) => tree.id === id);
+}
 export function chinaDay(now = Date.now()) {
   return new Date(now + 8 * 3600000).toISOString().slice(0, 10);
 }

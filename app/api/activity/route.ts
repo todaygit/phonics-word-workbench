@@ -38,16 +38,22 @@ export async function GET(request: Request) {
         .bind(user, range.start, range.end, range.size),
       bindings()
         .DB.prepare(`SELECT COALESCE(SUM(points),0) AS totalPoints, MIN(day) AS startedOn,
-        COALESCE(SUM(CASE WHEN day = ? THEN points ELSE 0 END),0) AS todayPoints
+        COALESCE(SUM(CASE WHEN day = ? THEN points ELSE 0 END),0) AS todayPoints,
+        MAX(CASE WHEN day = ? AND kind = 'login' THEN 1 ELSE 0 END) AS checkedInToday
         FROM learning_activity WHERE user_id = ?`)
-        .bind(chinaDay(), user),
+        .bind(chinaDay(), chinaDay(), user),
     ]);
     const summary = result[1].results[0] as {
       totalPoints: number;
       startedOn: string | null;
       todayPoints: number;
+      checkedInToday: number;
     };
-    return json({ rows: result[0].results, ...summary });
+    return json({
+      rows: result[0].results,
+      ...summary,
+      checkedInToday: Boolean(summary.checkedInToday),
+    });
   } catch (error) {
     return errorResponse(error);
   }

@@ -15,6 +15,13 @@
       "when": 1788832457322,
       "tag": "0001_spotty_shockwave",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1788841275936,
+      "tag": "0002_sour_ezekiel_stane",
+      "breakpoints": true
     }
   ]
 }

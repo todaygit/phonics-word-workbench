@@ -36,3 +36,20 @@ export const learningActivity = sqliteTable(
     ),
   ],
 );
+
+export const plantedTrees = sqliteTable(
+  'planted_trees',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull(),
+    requestId: text('request_id').notNull(),
+    treeId: text('tree_id').notNull(),
+    treeName: text('tree_name').notNull(),
+    cost: integer('cost').notNull(),
+    plantedAt: integer('planted_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('idx_planted_user_request').on(table.userId, table.requestId),
+    index('idx_planted_user_time').on(table.userId, table.plantedAt),
+  ],
+);
