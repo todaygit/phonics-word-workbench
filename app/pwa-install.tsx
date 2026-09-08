@@ -1,13 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  CheckCircle2,
-  Download,
-  RefreshCw,
-  Wifi,
-  WifiOff,
-} from 'lucide-react';
+import { CheckCircle2, Download, RefreshCw, Wifi, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 type InstallPromptEvent = Event & {
@@ -31,14 +25,18 @@ function isStandalone() {
 }
 
 async function cacheCurrentApp(registration: ServiceWorkerRegistration) {
-  const urls = new Set<string>([window.location.href, `${window.location.origin}${appBase()}`]);
+  const urls = new Set<string>([
+    window.location.href,
+    `${window.location.origin}${appBase()}`,
+  ]);
   for (const entry of performance.getEntriesByType('resource')) {
     if (!(entry instanceof PerformanceResourceTiming)) continue;
     const url = new URL(entry.name, window.location.href);
     if (url.origin === window.location.origin) urls.add(url.href);
   }
 
-  const worker = registration.active ?? registration.waiting ?? registration.installing;
+  const worker =
+    registration.active ?? registration.waiting ?? registration.installing;
   if (!worker) return false;
 
   return new Promise<boolean>((resolve) => {
@@ -48,10 +46,9 @@ async function cacheCurrentApp(registration: ServiceWorkerRegistration) {
       window.clearTimeout(timeout);
       resolve(event.data?.type === 'PHONICS_CACHE_READY');
     };
-    worker.postMessage(
-      { type: 'PHONICS_CACHE_URLS', urls: [...urls] },
-      [channel.port2],
-    );
+    worker.postMessage({ type: 'PHONICS_CACHE_URLS', urls: [...urls] }, [
+      channel.port2,
+    ]);
   });
 }
 
@@ -69,13 +66,19 @@ export function InstallAppPanel() {
     setMessage('正在准备离线内容…');
     const ready = await cacheCurrentApp(registration);
     setOfflineReady(ready);
-    setMessage(ready ? '工作台界面已可离线打开。' : '离线准备暂未完成，请联网后再试。');
+    setMessage(
+      ready ? '工作台界面已可离线打开。' : '离线准备暂未完成，请联网后再试。',
+    );
   }, []);
 
   useEffect(() => {
-    setPwaState(isStandalone() ? 'installed' : 'browser');
-    setOnline(navigator.onLine);
-    setOfflineReady(window.localStorage.getItem('phonics.pwa.offlineReady') === 'true');
+    const initialTimer = window.setTimeout(() => {
+      setPwaState(isStandalone() ? 'installed' : 'browser');
+      setOnline(navigator.onLine);
+      setOfflineReady(
+        window.localStorage.getItem('phonics.pwa.offlineReady') === 'true',
+      );
+    }, 0);
 
     const onInstallPrompt = (event: Event) => {
       event.preventDefault();
@@ -106,10 +109,13 @@ export function InstallAppPanel() {
           }
           await registration.update().catch(() => undefined);
         })
-        .catch(() => setMessage('当前浏览器没有完成离线准备，联网使用不受影响。'));
+        .catch(() =>
+          setMessage('当前浏览器没有完成离线准备，联网使用不受影响。'),
+        );
     }
 
     return () => {
+      window.clearTimeout(initialTimer);
       window.removeEventListener('beforeinstallprompt', onInstallPrompt);
       window.removeEventListener('appinstalled', onInstalled);
       window.removeEventListener('online', onOnline);
@@ -146,9 +152,7 @@ export function InstallAppPanel() {
         <h2 id="install-app-title">
           {pwaState === 'installed' ? '已经安装到这台设备' : '安装到手机或平板'}
         </h2>
-        <p>
-          安装后会出现在桌面，打开时像普通 App；电脑仍然可以继续使用网页。
-        </p>
+        <p>安装后会出现在桌面，打开时像普通 App；电脑仍然可以继续使用网页。</p>
         <div className="pwa-state-row" aria-live="polite">
           <span className={online ? 'is-ready' : 'is-offline'}>
             {online ? <Wifi /> : <WifiOff />}

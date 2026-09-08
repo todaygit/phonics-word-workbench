@@ -9,6 +9,7 @@ import {
   BookOpen,
   Check,
   CheckCircle2,
+  Cloud,
   ChevronLeft,
   ChevronRight,
   Download,
@@ -39,6 +40,7 @@ import { useLearning } from './use-learning';
 import { WordAudio } from './word-audio';
 import { RewardsView, StatisticsView } from './activity-views';
 import { InstallAppPanel } from './pwa-install';
+import { CloudSyncPanel, CloudSyncProvider } from './cloud-sync';
 import type { Award } from './activity-model';
 import { validParentPin } from './parent-lock';
 import {
@@ -295,7 +297,7 @@ function makeBlankWord(chapter: Chapter): Word {
   };
 }
 
-export default function Home() {
+function Workbench() {
   const learning = useLearning();
   const recognitionStats = learningStats(learning.data);
   const [chapters, setChapters] = useState<Chapter[]>(DEFAULT_CHAPTERS);
@@ -1497,6 +1499,9 @@ export default function Home() {
                   <TabsTrigger value="backup">
                     <FileJson /> 数据备份
                   </TabsTrigger>
+                  <TabsTrigger value="sync">
+                    <Cloud /> 设备同步
+                  </TabsTrigger>
                 </TabsList>
                 <TabsContent value="plan">
                   <RecognitionPlan store={learning} />
@@ -1993,7 +1998,7 @@ export default function Home() {
                     <output className="notice-banner">{quizMessage}</output>
                   )}
                   <p className="backup-storage-note">
-                    认词词库、语法题库、配图和进度按登录账户保存。原有拼写词库及复习进度仍保存在当前浏览器。备份包含两部分数据和图片引用；图片文件保留在本工作台账户中。积分和统计记录在云端独立保存，不包含在这个词库备份中，恢复词库不会回滚或叠加积分。
+                    登录“家庭设备同步”后，认词词库、拼写词库、语法题库、学习进度、积分统计和已种的树都会保存到家庭云端；断网时仍保留在当前设备，联网后自动补同步。JSON 备份主要用于手动保存词库和学习设置，不替代家庭云同步。
                   </p>
                   <div className="backup-grid">
                     <section className="backup-card">
@@ -2065,6 +2070,9 @@ export default function Home() {
                       </AlertDialog>
                     </section>
                   </div>
+                </TabsContent>
+                <TabsContent value="sync">
+                  <CloudSyncPanel />
                 </TabsContent>
               </Tabs>
             </section>
@@ -2281,5 +2289,13 @@ export default function Home() {
         </DialogContent>
       </Dialog>
     </SidebarProvider>
+  );
+}
+
+export default function Home() {
+  return (
+    <CloudSyncProvider>
+      <Workbench />
+    </CloudSyncProvider>
   );
 }

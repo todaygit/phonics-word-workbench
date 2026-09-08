@@ -1,12 +1,12 @@
-const CACHE_VERSION = 'phonics-workbench-v1';
+const CACHE_VERSION = 'phonics-workbench-v2';
 const APP_BASE = new URL('./', self.location.href).pathname;
 const APP_SHELL = [
   APP_BASE,
   `${APP_BASE}manifest.webmanifest`,
   `${APP_BASE}favicon.svg`,
-  `${APP_BASE}icon-192.svg`,
-  `${APP_BASE}icon-512.svg`,
-  `${APP_BASE}icon-maskable.svg`,
+  `${APP_BASE}icon-192.png`,
+  `${APP_BASE}icon-512.png`,
+  `${APP_BASE}icon-maskable.png`,
 ];
 
 self.addEventListener('install', (event) => {
