@@ -2,11 +2,14 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: '拼读小队 · 单词工作台',
-  description: '为家庭自然拼读学习设计的可调词库、每日学习与间隔复习工作台。',
+  title: '拼读小队 · v0.8 拼写工作台',
+  description:
+    '按自然拼读学习顺序进行缺字母与全词拼写测试，并提供独立家长控制词库。',
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default function RootLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="zh-CN">
       <body>{children}</body>

@@ -1,30 +1,38 @@
 'use client';
+/* oxlint-disable react/react-compiler, jsx-a11y/label-has-associated-control */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
+  BookMarked,
   BookOpen,
-  CalendarDays,
   Check,
+  CheckCircle2,
+  ChevronLeft,
   ChevronRight,
   CircleHelp,
-  Clock3,
   Download,
+  FileJson,
   Flame,
+  Headphones,
   Library,
-  ListRestart,
-  Pause,
+  ListChecks,
   Pencil,
   Play,
   Plus,
   RotateCcw,
   Search,
   Settings2,
+  ShieldCheck,
+  Shuffle,
   Sparkles,
+  Target,
   Trash2,
   Upload,
   Volume2,
+  XCircle,
 } from 'lucide-react';
+import rawBank from './word-bank-v08.json';
 import { Badge } from '@/components/ui/badge';
 import {
   AlertDialog,
@@ -38,18 +46,17 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Progress, ProgressLabel } from '@/components/ui/progress';
+import { Progress } from '@/components/ui/progress';
 import {
   Select,
   SelectContent,
@@ -63,69 +70,131 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 
 type WordStatus = 'new' | 'learning' | 'mastered';
-type ReviewStrategy = 'spaced' | 'mixed' | 'sound-first';
+type QuizMode = 'sequence' | 'chapter' | 'random';
+type QuizType = 'missing' | 'full';
 
+type Chapter = {
+  id: string;
+  order: number;
+  title: string;
+  rule: string;
+  childNote: string;
+  wordCount?: number;
+};
 type Word = {
   id: string;
+  chapterId: string;
+  chapterOrder: number;
+  wordOrder: number;
+  level: string;
   word: string;
+  ipa: string;
   phonics: string;
   meaning: string;
   example: string;
-  group: string;
   status: WordStatus;
   active: boolean;
   interval: number;
   nextReview: string;
   reviews: number;
 };
-
 type Settings = {
   newPerDay: number;
   reviewPerDay: number;
-  strategy: ReviewStrategy;
+  defaultQuizMode: QuizMode;
+  defaultQuizType: QuizType;
+  quizCount: number;
   autoSpeak: boolean;
 };
-
-const todayKey = () => new Date().toISOString().slice(0, 10);
-
-const DEFAULT_SETTINGS: Settings = {
-  newPerDay: 6,
-  reviewPerDay: 12,
-  strategy: 'spaced',
-  autoSpeak: false,
+type QuizSession = {
+  queue: Word[];
+  mode: QuizMode;
+  type: QuizType;
+  startCursor: number;
+  cursorAdvance: number;
+};
+type QuizResult = {
+  wordId: string;
+  word: string;
+  answer: string;
+  correct: boolean;
 };
 
-const seedWords: Word[] = [
-  { id: 'cat', word: 'cat', phonics: 'c · a · t', meaning: '猫', example: 'The cat is on the mat.', group: '短元音 a', status: 'learning', active: true, interval: 1, nextReview: todayKey(), reviews: 1 },
-  { id: 'map', word: 'map', phonics: 'm · a · p', meaning: '地图', example: 'This is a map.', group: '短元音 a', status: 'learning', active: true, interval: 2, nextReview: todayKey(), reviews: 2 },
-  { id: 'fish', word: 'fish', phonics: 'f · i · sh', meaning: '鱼', example: 'I see a red fish.', group: '短元音 i / sh', status: 'learning', active: true, interval: 1, nextReview: todayKey(), reviews: 1 },
-  { id: 'ship', word: 'ship', phonics: 'sh · i · p', meaning: '船', example: 'The ship is big.', group: '短元音 i / sh', status: 'learning', active: true, interval: 3, nextReview: todayKey(), reviews: 3 },
-  { id: 'sun', word: 'sun', phonics: 's · u · n', meaning: '太阳', example: 'The sun is hot.', group: '短元音 u', status: 'mastered', active: true, interval: 7, nextReview: todayKey(), reviews: 5 },
-  { id: 'bed', word: 'bed', phonics: 'b · e · d', meaning: '床', example: 'The bed is soft.', group: '短元音 e', status: 'mastered', active: true, interval: 7, nextReview: todayKey(), reviews: 5 },
-  { id: 'frog', word: 'frog', phonics: 'f · r · o · g', meaning: '青蛙', example: 'A frog can jump.', group: '辅音连缀 fr', status: 'new', active: true, interval: 0, nextReview: todayKey(), reviews: 0 },
-  { id: 'green', word: 'green', phonics: 'g · r · ee · n', meaning: '绿色', example: 'The frog is green.', group: '长元音 ee', status: 'new', active: true, interval: 0, nextReview: todayKey(), reviews: 0 },
-  { id: 'rain', word: 'rain', phonics: 'r · ai · n', meaning: '雨', example: 'I like the rain.', group: '元音组合 ai', status: 'new', active: true, interval: 0, nextReview: todayKey(), reviews: 0 },
-  { id: 'chair', word: 'chair', phonics: 'ch · air', meaning: '椅子', example: 'Sit on the chair.', group: '辅音组合 ch', status: 'new', active: true, interval: 0, nextReview: todayKey(), reviews: 0 },
-  { id: 'moon', word: 'moon', phonics: 'm · oo · n', meaning: '月亮', example: 'The moon is bright.', group: '元音组合 oo', status: 'new', active: true, interval: 0, nextReview: todayKey(), reviews: 0 },
-  { id: 'star', word: 'star', phonics: 's · t · ar', meaning: '星星', example: 'I see a star.', group: 'r 控制元音 ar', status: 'new', active: true, interval: 0, nextReview: todayKey(), reviews: 0 },
-];
+const BANK_VERSION = 'v0.8';
+const OLD_DEMO_IDS = new Set([
+  'cat',
+  'map',
+  'fish',
+  'ship',
+  'sun',
+  'bed',
+  'frog',
+  'green',
+  'rain',
+  'chair',
+  'moon',
+  'star',
+]);
 
-const strategyLabels: Record<ReviewStrategy, string> = {
-  spaced: '间隔复习',
-  mixed: '新旧混合',
-  'sound-first': '先听后认',
-};
-
-const statusLabels: Record<WordStatus, string> = {
-  new: '未学',
-  learning: '学习中',
-  mastered: '已掌握',
-};
+function localDateKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 function addDays(days: number) {
   const date = new Date();
   date.setDate(date.getDate() + days);
-  return date.toISOString().slice(0, 10);
+  return localDateKey(date);
+}
+
+const DEFAULT_SETTINGS: Settings = {
+  newPerDay: 6,
+  reviewPerDay: 12,
+  defaultQuizMode: 'sequence',
+  defaultQuizType: 'missing',
+  quizCount: 10,
+  autoSpeak: false,
+};
+const DEFAULT_CHAPTERS = rawBank.chapters as Chapter[];
+const DEFAULT_WORDS: Word[] = rawBank.words.map((item) => ({
+  ...item,
+  status: 'new' as WordStatus,
+  active: true,
+  interval: 0,
+  nextReview: localDateKey(),
+  reviews: 0,
+}));
+const modeInfo: Record<QuizMode, { title: string; description: string }> = {
+  sequence: {
+    title: '按学习顺序',
+    description: '从上次位置继续，严格按 v0.8 章节和词序测试。',
+  },
+  chapter: {
+    title: '选择章节',
+    description: '家长或孩子勾选几个章节，章节内仍按学习顺序。',
+  },
+  random: {
+    title: '随机挑战',
+    description: '从已启用词库中随机抽词，适合后期综合检查。',
+  },
+};
+const typeInfo: Record<QuizType, { title: string; description: string }> = {
+  missing: {
+    title: '缺字母测试',
+    description: '保留部分字母，只填写空缺位置。适合学习初期。',
+  },
+  full: {
+    title: '全单词测试',
+    description: '听发音、看中文，完整拼写整个单词。',
+  },
+};
+
+function sortWords(words: Word[]) {
+  return [...words].sort(
+    (a, b) => a.chapterOrder - b.chapterOrder || a.wordOrder - b.wordOrder,
+  );
 }
 
 function speak(text: string) {
@@ -133,98 +202,238 @@ function speak(text: string) {
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = 'en-US';
-  utterance.rate = 0.78;
+  utterance.rate = 0.76;
   window.speechSynthesis.speak(utterance);
 }
 
 function loadStored<T>(key: string, fallback: T): T {
   if (typeof window === 'undefined') return fallback;
   try {
-    const value = window.localStorage.getItem(key);
-    return value ? (JSON.parse(value) as T) : fallback;
+    const stored = window.localStorage.getItem(key);
+    return stored ? (JSON.parse(stored) as T) : fallback;
   } catch {
     return fallback;
   }
 }
 
-function sliderFirst(value: number | readonly number[]) {
-  return typeof value === 'number' ? value : value[0];
+function normalizeAnswer(value: string) {
+  return value.toLowerCase().trim().replace(/\s+/g, ' ');
+}
+
+function shuffle<T>(items: T[]) {
+  const result = [...items];
+  for (let index = result.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [result[index], result[swapIndex]] = [result[swapIndex], result[index]];
+  }
+  return result;
+}
+
+function createMissingPrompt(word: string) {
+  const letters = word.split('');
+  const letterIndexes = letters
+    .map((letter, index) => (/[a-z]/i.test(letter) ? index : -1))
+    .filter((index) => index >= 0);
+  const blankCount =
+    letterIndexes.length <= 3 ? 1 : letterIndexes.length <= 6 ? 2 : 3;
+  const chosen = new Set<number>();
+  for (let slot = 1; slot <= blankCount; slot += 1) {
+    chosen.add(
+      letterIndexes[
+        Math.round(((letterIndexes.length - 1) * slot) / (blankCount + 1))
+      ],
+    );
+  }
+  for (const index of letterIndexes) {
+    if (chosen.size >= blankCount) break;
+    chosen.add(index);
+  }
+  return {
+    mask: letters
+      .map((letter, index) => (chosen.has(index) ? '_' : letter))
+      .join(''),
+    answer: letters.filter((_, index) => chosen.has(index)).join(''),
+  };
+}
+
+function makeBlankWord(chapter: Chapter): Word {
+  return {
+    id: `custom-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    chapterId: chapter.id,
+    chapterOrder: chapter.order,
+    wordOrder: 1,
+    level: '自定义',
+    word: '',
+    ipa: '',
+    phonics: '',
+    meaning: '',
+    example: '',
+    status: 'new',
+    active: true,
+    interval: 0,
+    nextReview: localDateKey(),
+    reviews: 0,
+  };
 }
 
 export default function Home() {
-  const [words, setWords] = useState<Word[]>(seedWords);
+  const [chapters, setChapters] = useState<Chapter[]>(DEFAULT_CHAPTERS);
+  const [words, setWords] = useState<Word[]>(DEFAULT_WORDS);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [tab, setTab] = useState('today');
-  const [session, setSession] = useState<Word[] | null>(null);
-  const [sessionIndex, setSessionIndex] = useState(0);
-  const [revealed, setRevealed] = useState(false);
-  const [completed, setCompleted] = useState(0);
-  const [dailyGoal, setDailyGoal] = useState(0);
-  const [query, setQuery] = useState('');
-  const [groupFilter, setGroupFilter] = useState('all');
-  const [editingWord, setEditingWord] = useState<Word | null>(null);
-  const [bulkText, setBulkText] = useState('');
+  const [parentTab, setParentTab] = useState('plan');
   const [hydrated, setHydrated] = useState(false);
+  const [sequenceCursor, setSequenceCursor] = useState(0);
+  const [completedToday, setCompletedToday] = useState(0);
+  const [quizMode, setQuizMode] = useState<QuizMode>('sequence');
+  const [quizType, setQuizType] = useState<QuizType>('missing');
+  const [selectedChapters, setSelectedChapters] = useState<string[]>([
+    DEFAULT_CHAPTERS[0]?.id ?? '',
+  ]);
+  const [session, setSession] = useState<QuizSession | null>(null);
+  const [quizIndex, setQuizIndex] = useState(0);
+  const [quizInput, setQuizInput] = useState('');
+  const [checked, setChecked] = useState(false);
+  const [quizFinished, setQuizFinished] = useState(false);
+  const [results, setResults] = useState<QuizResult[]>([]);
+  const [quizMessage, setQuizMessage] = useState('');
+  const [query, setQuery] = useState('');
+  const [chapterFilter, setChapterFilter] = useState('all');
+  const [wordPage, setWordPage] = useState(1);
+  const [draftWord, setDraftWord] = useState<Word | null>(null);
+  const [isNewWord, setIsNewWord] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkText, setBulkText] = useState('');
+  const [parentChapterId, setParentChapterId] = useState(
+    DEFAULT_CHAPTERS[0]?.id ?? '',
+  );
   const importRef = useRef<HTMLInputElement>(null);
+  const answerRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setWords(loadStored('phonics.words', seedWords));
-    setSettings(loadStored('phonics.settings', DEFAULT_SETTINGS));
-    setCompleted(loadStored(`phonics.completed.${todayKey()}`, 0));
-    setDailyGoal(loadStored(`phonics.goal.${todayKey()}`, 0));
+    const storedVersion = window.localStorage.getItem('phonics.bankVersion');
+    const storedWords = loadStored<Word[]>('phonics.words', []);
+    if (storedVersion === BANK_VERSION && storedWords.length) {
+      setWords(storedWords);
+      setChapters(loadStored<Chapter[]>('phonics.chapters', DEFAULT_CHAPTERS));
+    } else {
+      const customWords = storedWords.filter(
+        (word) => !OLD_DEMO_IDS.has(word.id),
+      );
+      setWords([...DEFAULT_WORDS, ...customWords]);
+      setChapters(DEFAULT_CHAPTERS);
+      window.localStorage.setItem('phonics.bankVersion', BANK_VERSION);
+    }
+    const mergedSettings = {
+      ...DEFAULT_SETTINGS,
+      ...loadStored<Partial<Settings>>('phonics.settings', {}),
+    };
+    setSettings(mergedSettings);
+    setQuizMode(mergedSettings.defaultQuizMode);
+    setQuizType(mergedSettings.defaultQuizType);
+    setSequenceCursor(loadStored('phonics.sequenceCursor', 0));
+    setCompletedToday(loadStored(`phonics.completed.${localDateKey()}`, 0));
     setHydrated(true);
   }, []);
 
   useEffect(() => {
-    if (hydrated) window.localStorage.setItem('phonics.words', JSON.stringify(words));
-  }, [words, hydrated]);
+    if (!hydrated) return;
+    window.localStorage.setItem('phonics.words', JSON.stringify(words));
+    window.localStorage.setItem('phonics.chapters', JSON.stringify(chapters));
+    window.localStorage.setItem('phonics.settings', JSON.stringify(settings));
+    window.localStorage.setItem(
+      'phonics.sequenceCursor',
+      JSON.stringify(sequenceCursor),
+    );
+    window.localStorage.setItem(
+      `phonics.completed.${localDateKey()}`,
+      JSON.stringify(completedToday),
+    );
+    window.localStorage.setItem('phonics.bankVersion', BANK_VERSION);
+  }, [chapters, completedToday, hydrated, sequenceCursor, settings, words]);
 
-  useEffect(() => {
-    if (hydrated) window.localStorage.setItem('phonics.settings', JSON.stringify(settings));
-  }, [settings, hydrated]);
-
-  useEffect(() => {
-    if (hydrated) window.localStorage.setItem(`phonics.completed.${todayKey()}`, JSON.stringify(completed));
-  }, [completed, hydrated]);
-
-  useEffect(() => {
-    if (hydrated) window.localStorage.setItem(`phonics.goal.${todayKey()}`, JSON.stringify(dailyGoal));
-  }, [dailyGoal, hydrated]);
-
+  const activeWords = useMemo(
+    () => sortWords(words.filter((word) => word.active)),
+    [words],
+  );
+  const orderedChapters = useMemo(
+    () => [...chapters].sort((a, b) => a.order - b.order),
+    [chapters],
+  );
+  const currentLearningWord =
+    activeWords[sequenceCursor % Math.max(activeWords.length, 1)];
+  const currentChapter =
+    chapters.find((chapter) => chapter.id === currentLearningWord?.chapterId) ??
+    chapters[0];
   const dueWords = useMemo(
-    () => words.filter((word) => word.active && word.status !== 'new' && word.nextReview <= todayKey()),
-    [words],
+    () =>
+      activeWords.filter(
+        (word) => word.status !== 'new' && word.nextReview <= localDateKey(),
+      ),
+    [activeWords],
   );
-  const newWords = useMemo(
-    () => words.filter((word) => word.active && word.status === 'new'),
-    [words],
-  );
-  const todayTotal = Math.min(dueWords.length, settings.reviewPerDay) + Math.min(newWords.length, settings.newPerDay);
-  const displayGoal = dailyGoal || todayTotal;
-  const focusGroups = useMemo(() => {
-    const candidates = [...dueWords, ...newWords].slice(0, 8);
-    const counts = new Map<string, number>();
-    candidates.forEach((word) => counts.set(word.group, (counts.get(word.group) ?? 0) + 1));
-    return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
-  }, [dueWords, newWords]);
-
-  const groups = useMemo(() => [...new Set(words.map((word) => word.group))].sort(), [words]);
+  const masteredCount = words.filter(
+    (word) => word.status === 'mastered',
+  ).length;
+  const learningCount = words.filter(
+    (word) => word.status === 'learning',
+  ).length;
+  const progressPercent = settings.quizCount
+    ? Math.min(100, Math.round((completedToday / settings.quizCount) * 100))
+    : 0;
   const filteredWords = useMemo(() => {
     const lower = query.trim().toLowerCase();
-    return words.filter((word) => {
-      const matchText = !lower || `${word.word} ${word.meaning} ${word.phonics}`.toLowerCase().includes(lower);
-      const matchGroup = groupFilter === 'all' || word.group === groupFilter;
-      return matchText && matchGroup;
-    });
-  }, [words, query, groupFilter]);
-
-  const masteredCount = words.filter((word) => word.status === 'mastered').length;
-  const learningCount = words.filter((word) => word.status === 'learning').length;
-  const currentWord = session?.[sessionIndex] ?? null;
+    return sortWords(
+      words.filter((word) => {
+        const matchesChapter =
+          chapterFilter === 'all' || word.chapterId === chapterFilter;
+        return (
+          matchesChapter &&
+          (!lower ||
+            `${word.word} ${word.meaning} ${word.ipa} ${word.phonics}`
+              .toLowerCase()
+              .includes(lower))
+        );
+      }),
+    );
+  }, [chapterFilter, query, words]);
+  const pageSize = 60;
+  const totalPages = Math.max(1, Math.ceil(filteredWords.length / pageSize));
+  const visibleWords = filteredWords.slice(
+    (wordPage - 1) * pageSize,
+    wordPage * pageSize,
+  );
+  const activeParentChapter =
+    chapters.find((chapter) => chapter.id === parentChapterId) ?? chapters[0];
+  const currentQuizWord = session?.queue[quizIndex] ?? null;
+  const missingPrompt = currentQuizWord
+    ? createMissingPrompt(currentQuizWord.word)
+    : null;
+  const expectedAnswer = currentQuizWord
+    ? session?.type === 'missing'
+      ? (missingPrompt?.answer ?? '')
+      : currentQuizWord.word
+    : '';
+  const latestResult = results[results.length - 1];
+  const selectedQuizWordCount = activeWords.filter((word) =>
+    selectedChapters.includes(word.chapterId),
+  ).length;
+  const launchCount =
+    quizMode === 'chapter'
+      ? selectedQuizWordCount
+      : Math.min(settings.quizCount, activeWords.length);
 
   useEffect(() => {
-    if (settings.autoSpeak && currentWord) speak(currentWord.word);
-  }, [currentWord, settings.autoSpeak]);
+    setWordPage(1);
+  }, [chapterFilter, query]);
+  useEffect(() => {
+    if (wordPage > totalPages) setWordPage(totalPages);
+  }, [totalPages, wordPage]);
+  useEffect(() => {
+    if (!currentQuizWord || checked || quizFinished) return;
+    setTimeout(() => answerRef.current?.focus(), 80);
+    if (settings.autoSpeak) speak(currentQuizWord.word);
+  }, [checked, currentQuizWord, quizFinished, settings.autoSpeak]);
 
   useEffect(() => {
     type WebTool = {
@@ -233,281 +442,562 @@ export default function Home() {
       description: string;
       inputSchema: object;
       annotations: { readOnlyHint: boolean; untrustedContentHint: boolean };
-      execute: (input: unknown) => unknown | Promise<unknown>;
+      execute: (input: unknown) => object | Promise<object>;
     };
     type WebContext = {
-      registerTool: (tool: WebTool, options?: { signal?: AbortSignal }) => void | Promise<void>;
+      registerTool: (
+        tool: WebTool,
+        options?: { signal?: AbortSignal },
+      ) => void | Promise<void>;
     };
-    const context = (document as Document & { modelContext?: WebContext }).modelContext;
+    const context = (document as Document & { modelContext?: WebContext })
+      .modelContext;
     if (!context?.registerTool) return;
     const lifecycle = new AbortController();
-    const afterPaint = () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
     const register = (tool: WebTool) => {
       try {
-        void Promise.resolve(context.registerTool(tool, { signal: lifecycle.signal })).catch((error) => {
-          if (!(error instanceof DOMException && error.name === 'AbortError')) console.warn(error);
-        });
-      } catch (error) {
-        console.warn(error);
+        void Promise.resolve(
+          context.registerTool(tool, { signal: lifecycle.signal }),
+        ).catch(() => undefined);
+      } catch {
+        /* optional host integration */
       }
     };
-
     register({
-      name: 'get_daily_phonics_plan',
-      title: '查看今日拼读计划',
-      description: '读取今天到期的复习量、新词量和当前学习设置，不修改数据。',
-      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+      name: 'get_phonics_workbench_summary',
+      title: '查看自然拼读工作台概况',
+      description: '查看 v0.8 词库、当前学习位置和今日完成量，不修改数据。',
+      inputSchema: {
+        type: 'object',
+        properties: {},
+        additionalProperties: false,
+      },
       annotations: { readOnlyHint: true, untrustedContentHint: false },
       execute: () => ({
-        dueReviews: Math.min(dueWords.length, settings.reviewPerDay),
-        newWords: Math.min(newWords.length, settings.newPerDay),
-        completed,
-        strategy: settings.strategy,
+        version: BANK_VERSION,
+        chapters: chapters.length,
+        words: words.length,
+        activeWords: activeWords.length,
+        currentChapter: currentChapter?.title,
+        completedToday,
       }),
     });
-
     register({
-      name: 'configure_phonics_study_plan',
-      title: '调整拼读学习计划',
-      description: '调整每天的新词数、复习上限或复习方式，并同步更新工作台。',
+      name: 'configure_phonics_parent_controls',
+      title: '调整家长控制设置',
+      description: '调整每日新词、复习量、默认测试方式和每次题数。',
       inputSchema: {
         type: 'object',
         properties: {
-          newPerDay: { type: 'integer', minimum: 0, maximum: 20 },
-          reviewPerDay: { type: 'integer', minimum: 5, maximum: 40 },
-          strategy: { type: 'string', enum: ['spaced', 'mixed', 'sound-first'] },
+          newPerDay: { type: 'integer', minimum: 0, maximum: 30 },
+          reviewPerDay: { type: 'integer', minimum: 0, maximum: 50 },
+          quizCount: { type: 'integer', minimum: 5, maximum: 50 },
+          defaultQuizMode: {
+            type: 'string',
+            enum: ['sequence', 'chapter', 'random'],
+          },
+          defaultQuizType: { type: 'string', enum: ['missing', 'full'] },
         },
         additionalProperties: false,
       },
       annotations: { readOnlyHint: false, untrustedContentHint: false },
-      execute: async (input) => {
-        if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('学习计划参数必须是对象。');
-        const value = input as Partial<Settings>;
-        if (value.newPerDay !== undefined && (!Number.isInteger(value.newPerDay) || value.newPerDay < 0 || value.newPerDay > 20)) throw new Error('newPerDay 必须是 0 到 20 的整数。');
-        if (value.reviewPerDay !== undefined && (!Number.isInteger(value.reviewPerDay) || value.reviewPerDay < 5 || value.reviewPerDay > 40)) throw new Error('reviewPerDay 必须是 5 到 40 的整数。');
-        if (value.strategy !== undefined && !['spaced', 'mixed', 'sound-first'].includes(value.strategy)) throw new Error('strategy 无效。');
-        setSettings((current) => ({ ...current, ...value }));
-        setTab('settings');
-        await afterPaint();
-        return { updated: true, ...value };
+      execute: (input) => {
+        if (!input || typeof input !== 'object' || Array.isArray(input))
+          throw new Error('设置参数必须是对象。');
+        setSettings((current) => ({
+          ...current,
+          ...(input as Partial<Settings>),
+        }));
+        setTab('parent');
+        setParentTab('plan');
+        return { updated: true };
       },
     });
-
     register({
-      name: 'add_phonics_words',
-      title: '批量加入拼读单词',
-      description: '把一个或多个英文单词连同中文、拼读拆分和拼读组加入词库。',
+      name: 'add_phonics_word',
+      title: '加入一个拼读单词',
+      description: '向家长词库加入英文、中文、音标、拆分和例句。',
       inputSchema: {
         type: 'object',
         properties: {
-          words: {
-            type: 'array',
-            minItems: 1,
-            maxItems: 100,
-            items: {
-              type: 'object',
-              properties: {
-                word: { type: 'string', minLength: 1 },
-                meaning: { type: 'string', minLength: 1 },
-                phonics: { type: 'string' },
-                group: { type: 'string' },
-                example: { type: 'string' },
-              },
-              required: ['word', 'meaning'],
-              additionalProperties: false,
-            },
-          },
+          word: { type: 'string', minLength: 1 },
+          meaning: { type: 'string', minLength: 1 },
+          ipa: { type: 'string' },
+          phonics: { type: 'string' },
+          example: { type: 'string' },
+          chapterId: { type: 'string' },
         },
-        required: ['words'],
+        required: ['word', 'meaning'],
         additionalProperties: false,
       },
       annotations: { readOnlyHint: false, untrustedContentHint: true },
-      execute: async (input) => {
-        const value = input as { words?: Array<Partial<Word>> };
-        if (!Array.isArray(value?.words) || value.words.length < 1 || value.words.length > 100) throw new Error('words 必须包含 1 到 100 个单词。');
-        const additions = value.words.map((item, index) => {
-          const word = String(item.word ?? '').trim();
-          const meaning = String(item.meaning ?? '').trim();
-          if (!word || !meaning) throw new Error(`第 ${index + 1} 个单词缺少英文或中文。`);
-          return {
-            id: `${Date.now()}-agent-${index}`,
-            word,
-            meaning,
-            phonics: String(item.phonics ?? '').trim() || word.split('').join(' · '),
-            group: String(item.group ?? '').trim() || '智能导入',
-            example: String(item.example ?? '').trim(),
-            status: 'new' as WordStatus,
-            active: true,
-            interval: 0,
-            nextReview: todayKey(),
-            reviews: 0,
-          };
-        });
-        setWords((current) => [...additions, ...current]);
-        setTab('library');
-        await afterPaint();
-        return { added: additions.length, words: additions.map((item) => item.word) };
+      execute: (input) => {
+        const value = input as Partial<Word>;
+        const chapter =
+          chapters.find((item) => item.id === value.chapterId) ?? chapters[0];
+        if (
+          !chapter ||
+          !String(value.word ?? '').trim() ||
+          !String(value.meaning ?? '').trim()
+        )
+          throw new Error('英文和中文词义不能为空。');
+        const addition = {
+          ...makeBlankWord(chapter),
+          word: String(value.word).trim(),
+          meaning: String(value.meaning).trim(),
+          ipa: String(value.ipa ?? '').trim(),
+          phonics: String(value.phonics ?? '').trim(),
+          example: String(value.example ?? '').trim(),
+        };
+        setWords((current) => [
+          ...current,
+          {
+            ...addition,
+            wordOrder:
+              Math.max(
+                0,
+                ...current
+                  .filter((word) => word.chapterId === chapter.id)
+                  .map((word) => word.wordOrder),
+              ) + 1,
+          },
+        ]);
+        setTab('parent');
+        setParentTab('library');
+        return { added: addition.word, chapter: chapter.title };
       },
     });
-
     return () => lifecycle.abort();
-  }, [completed, dueWords, newWords, settings]);
+  }, [
+    activeWords.length,
+    chapters,
+    completedToday,
+    currentChapter?.title,
+    words.length,
+  ]);
 
-  const startSession = () => {
-    const reviews = dueWords.slice(0, settings.reviewPerDay);
-    const fresh = newWords.slice(0, settings.newPerDay);
-    const queue = settings.strategy === 'mixed'
-      ? reviews.flatMap((word, index) => fresh[index] ? [word, fresh[index]] : [word]).concat(fresh.slice(reviews.length))
-      : [...reviews, ...fresh];
-    setDailyGoal((value) => Math.max(value, completed + queue.length));
-    setSession(queue);
-    setSessionIndex(0);
-    setRevealed(false);
-  };
-
-  const gradeWord = (grade: 'again' | 'hard' | 'easy') => {
-    if (!currentWord) return;
-    const nextInterval = grade === 'again'
-      ? 1
-      : grade === 'hard'
-        ? Math.max(2, Math.round(Math.max(currentWord.interval, 1) * 1.6))
-        : Math.max(4, Math.round(Math.max(currentWord.interval, 1) * 2.5));
-    setWords((items) => items.map((word) => word.id === currentWord.id ? {
-      ...word,
-      status: grade === 'easy' && nextInterval >= 7 ? 'mastered' : 'learning',
-      interval: nextInterval,
-      nextReview: addDays(nextInterval),
-      reviews: word.reviews + 1,
-    } : word));
-    setCompleted((value) => value + 1);
-    if (session && sessionIndex < session.length - 1) {
-      setSessionIndex((value) => value + 1);
-      setRevealed(false);
-    } else {
-      setSession([]);
+  function buildQuiz(mode = quizMode, type = quizType) {
+    if (!activeWords.length) {
+      setQuizMessage('当前没有启用的单词，请到家长控制里启用或添加单词。');
+      return;
     }
-  };
+    let queue: Word[] = [];
+    let startCursor = 0;
+    let cursorAdvance = 0;
+    if (mode === 'sequence') {
+      startCursor = sequenceCursor % activeWords.length;
+      queue = [
+        ...activeWords.slice(startCursor),
+        ...activeWords.slice(0, startCursor),
+      ].slice(0, Math.min(settings.quizCount, activeWords.length));
+      cursorAdvance = queue.length;
+    } else if (mode === 'chapter') {
+      queue = activeWords.filter((word) =>
+        selectedChapters.includes(word.chapterId),
+      );
+    } else {
+      queue = shuffle(activeWords).slice(
+        0,
+        Math.min(settings.quizCount, activeWords.length),
+      );
+    }
+    if (!queue.length) {
+      setQuizMessage('请至少选择一个有启用单词的章节。');
+      return;
+    }
+    setQuizMessage('');
+    setSession({ queue, mode, type, startCursor, cursorAdvance });
+    setQuizIndex(0);
+    setQuizInput('');
+    setChecked(false);
+    setQuizFinished(false);
+    setResults([]);
+  }
 
-  const saveWord = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const data = new FormData(event.currentTarget);
-    const base: Word = {
-      id: editingWord?.id ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      word: String(data.get('word') ?? '').trim(),
-      phonics: String(data.get('phonics') ?? '').trim(),
-      meaning: String(data.get('meaning') ?? '').trim(),
-      example: String(data.get('example') ?? '').trim(),
-      group: String(data.get('group') ?? '自定义').trim() || '自定义',
-      status: editingWord?.status ?? 'new',
-      active: editingWord?.active ?? true,
-      interval: editingWord?.interval ?? 0,
-      nextReview: editingWord?.nextReview ?? todayKey(),
-      reviews: editingWord?.reviews ?? 0,
+  function buildDailyQuiz() {
+    if (!activeWords.length) {
+      setQuizMessage('当前没有启用的单词，请到家长控制里启用或添加单词。');
+      setTab('test');
+      return;
+    }
+    const startCursor = sequenceCursor % activeWords.length;
+    const wrapped = [
+      ...activeWords.slice(startCursor),
+      ...activeWords.slice(0, startCursor),
+    ];
+    const fresh = wrapped
+      .filter((word) => word.status === 'new')
+      .slice(0, settings.newPerDay);
+    const reviews = dueWords.slice(0, settings.reviewPerDay);
+    const seen = new Set<string>();
+    const queue = [...reviews, ...fresh].filter((word) => {
+      if (seen.has(word.id)) return false;
+      seen.add(word.id);
+      return true;
+    });
+    if (!queue.length) {
+      buildQuiz('sequence', settings.defaultQuizType);
+      return;
+    }
+    setSession({
+      queue,
+      mode: 'sequence',
+      type: settings.defaultQuizType,
+      startCursor,
+      cursorAdvance: fresh.length,
+    });
+    setQuizIndex(0);
+    setQuizInput('');
+    setChecked(false);
+    setQuizFinished(false);
+    setResults([]);
+  }
+
+  function checkAnswer() {
+    if (!currentQuizWord || !quizInput.trim() || checked) return;
+    const isCorrect =
+      normalizeAnswer(quizInput) === normalizeAnswer(expectedAnswer);
+    setResults((current) => [
+      ...current,
+      {
+        wordId: currentQuizWord.id,
+        word: currentQuizWord.word,
+        answer: quizInput,
+        correct: isCorrect,
+      },
+    ]);
+    setChecked(true);
+    setCompletedToday((value) => value + 1);
+    setWords((items) =>
+      items.map((word) => {
+        if (word.id !== currentQuizWord.id) return word;
+        const nextReviews = word.reviews + 1;
+        const interval = isCorrect
+          ? Math.max(1, Math.round(Math.max(word.interval, 1) * 1.8))
+          : 1;
+        return {
+          ...word,
+          reviews: nextReviews,
+          interval,
+          nextReview: isCorrect ? addDays(interval) : localDateKey(),
+          status: isCorrect && nextReviews >= 3 ? 'mastered' : 'learning',
+        };
+      }),
+    );
+  }
+
+  function nextQuestion() {
+    if (!session) return;
+    if (quizIndex < session.queue.length - 1) {
+      setQuizIndex((value) => value + 1);
+      setQuizInput('');
+      setChecked(false);
+      return;
+    }
+    if (session.mode === 'sequence' && activeWords.length)
+      setSequenceCursor(
+        (session.startCursor + session.cursorAdvance) % activeWords.length,
+      );
+    setQuizFinished(true);
+  }
+
+  function closeSession() {
+    setSession(null);
+    setQuizFinished(false);
+    setTab('test');
+  }
+
+  function saveDraftWord() {
+    if (!draftWord?.word.trim() || !draftWord.meaning.trim()) return;
+    const chapter =
+      chapters.find((item) => item.id === draftWord.chapterId) ?? chapters[0];
+    if (!chapter) return;
+    const saved: Word = {
+      ...draftWord,
+      chapterOrder: chapter.order,
+      wordOrder: draftWord.wordOrder,
+      word: draftWord.word.trim(),
+      meaning: draftWord.meaning.trim(),
+      ipa: draftWord.ipa.trim(),
+      phonics: draftWord.phonics.trim(),
+      example: draftWord.example.trim(),
     };
-    if (!base.word || !base.meaning) return;
-    setWords((items) => editingWord ? items.map((word) => word.id === editingWord.id ? base : word) : [base, ...items]);
-    setEditingWord(null);
-  };
+    setWords((items) =>
+      isNewWord
+        ? [...items, saved]
+        : items.map((word) => (word.id === saved.id ? saved : word)),
+    );
+    setDraftWord(null);
+  }
 
-  const importBulk = () => {
-    const additions = bulkText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line, index) => {
-      const [word, meaning, phonics = '', group = '批量导入', example = ''] = line.split(/[,，\t]/).map((cell) => cell.trim());
-      if (!word || !meaning) return null;
-      return {
-        id: `${Date.now()}-${index}`,
-        word,
-        phonics: phonics || word.split('').join(' · '),
-        meaning,
-        example,
-        group: group || '批量导入',
-        status: 'new' as WordStatus,
-        active: true,
-        interval: 0,
-        nextReview: todayKey(),
-        reviews: 0,
-      };
-    }).filter((word): word is Word => Boolean(word));
-    if (additions.length) setWords((items) => [...additions, ...items]);
+  function addChapter() {
+    const order = Math.max(0, ...chapters.map((chapter) => chapter.order)) + 1;
+    const chapter: Chapter = {
+      id: `custom-${Date.now()}`,
+      order,
+      title: `自定义章节 ${order}`,
+      rule: '请填写本章规则说明。',
+      childNote: '请填写给孩子的讲法。',
+      wordCount: 0,
+    };
+    setChapters((items) => [...items, chapter]);
+    setParentChapterId(chapter.id);
+  }
+
+  function importBulkWords() {
+    if (!activeParentChapter) return;
+    const startOrder = Math.max(
+      0,
+      ...words
+        .filter((word) => word.chapterId === activeParentChapter.id)
+        .map((word) => word.wordOrder),
+    );
+    const additions = bulkText
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line, index) => {
+        const [
+          word,
+          meaning,
+          ipa = '',
+          phonics = '',
+          example = '',
+          level = '自定义',
+        ] = line.split(/\t|，|,/).map((cell) => cell.trim());
+        if (!word || !meaning) return null;
+        return {
+          ...makeBlankWord(activeParentChapter),
+          id: `bulk-${Date.now()}-${index}`,
+          word,
+          meaning,
+          ipa,
+          phonics,
+          example,
+          level,
+          wordOrder: startOrder + index + 1,
+        };
+      })
+      .filter((word): word is Word => Boolean(word));
+    setWords((items) => [...items, ...additions]);
     setBulkText('');
-  };
+    setBulkOpen(false);
+  }
 
-  const exportWords = () => {
-    const blob = new Blob([JSON.stringify({ words, settings }, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
+  function exportBackup() {
+    const payload = JSON.stringify(
+      {
+        version: BANK_VERSION,
+        exportedAt: new Date().toISOString(),
+        chapters,
+        words,
+        settings,
+        sequenceCursor,
+      },
+      null,
+      2,
+    );
+    const url = URL.createObjectURL(
+      new Blob([payload], { type: 'application/json' }),
+    );
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = `拼读词库-${todayKey()}.json`;
+    anchor.download = `自然拼读工作台-${localDateKey()}.json`;
     anchor.click();
     URL.revokeObjectURL(url);
-  };
+  }
 
-  const importFile = (file?: File) => {
+  async function importBackup(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const data = JSON.parse(String(reader.result));
-        if (Array.isArray(data.words)) setWords(data.words);
-        if (data.settings) setSettings({ ...DEFAULT_SETTINGS, ...data.settings });
-      } catch {
-        window.alert('这个文件无法识别，请选择从本工作台导出的 JSON 文件。');
-      }
-    };
-    reader.readAsText(file);
-  };
+    try {
+      const data = JSON.parse(await file.text()) as {
+        chapters?: Chapter[];
+        words?: Word[];
+        settings?: Partial<Settings>;
+        sequenceCursor?: number;
+      };
+      if (!Array.isArray(data.chapters) || !Array.isArray(data.words))
+        throw new Error('invalid');
+      setChapters(data.chapters);
+      setWords(data.words);
+      setSettings((current) => ({ ...current, ...data.settings }));
+      setSequenceCursor(
+        Number.isInteger(data.sequenceCursor) ? Number(data.sequenceCursor) : 0,
+      );
+      setQuizMessage('备份已恢复。');
+    } catch {
+      setQuizMessage('这个文件不是有效的工作台备份。');
+    } finally {
+      event.target.value = '';
+    }
+  }
 
-  const weekday = new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', weekday: 'short' }).format(new Date());
+  function resetToV08() {
+    setChapters(DEFAULT_CHAPTERS);
+    setWords(DEFAULT_WORDS);
+    setSequenceCursor(0);
+    setCompletedToday(0);
+    setSettings(DEFAULT_SETTINGS);
+    setSelectedChapters([DEFAULT_CHAPTERS[0]?.id ?? '']);
+  }
 
   if (session) {
-    if (session.length === 0) {
+    if (quizFinished) {
+      const correctCount = results.filter((result) => result.correct).length;
+      const wrongResults = results.filter((result) => !result.correct);
       return (
         <main className="session-shell">
           <section className="finish-card">
-            <div className="finish-burst"><Sparkles /></div>
-            <p className="eyebrow">今日打卡完成</p>
-            <h1>做得很棒，休息一下吧！</h1>
-            <p>今天完成了 {completed} 次单词练习。系统已经根据答案安排好下一次复习。</p>
-            <Button className="primary-action" onClick={() => setSession(null)}><Check /> 回到工作台</Button>
+            <div className="finish-burst">
+              <Sparkles />
+            </div>
+            <p className="eyebrow">本轮完成</p>
+            <h1>
+              {correctCount} / {results.length} 拼对了
+            </h1>
+            <p>
+              {wrongResults.length
+                ? '拼错的词已经放回近期复习，下一轮会更有针对性。'
+                : '全部拼对，继续保持！'}
+            </p>
+            {wrongResults.length > 0 && (
+              <div className="mistake-list">
+                <strong>本轮需要再看一眼</strong>
+                <div>
+                  {wrongResults.map((result) => (
+                    <span key={result.wordId}>{result.word}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="finish-actions">
+              <Button variant="outline" onClick={closeSession}>
+                返回测试中心
+              </Button>
+              <Button
+                className="primary-action"
+                onClick={() => buildQuiz(session.mode, session.type)}
+              >
+                <RotateCcw /> 再来一轮
+              </Button>
+            </div>
           </section>
         </main>
       );
     }
-
+    if (!currentQuizWord) return null;
+    const chapter = chapters.find(
+      (item) => item.id === currentQuizWord.chapterId,
+    );
+    const isLatestCorrect = latestResult?.correct;
     return (
       <main className="session-shell">
         <div className="session-topbar">
-          <Button variant="ghost" size="lg" onClick={() => setSession(null)}><ArrowLeft /> 暂停并返回</Button>
-          <Progress value={((sessionIndex + 1) / session.length) * 100} className="session-progress">
-            <ProgressLabel>第 {sessionIndex + 1} 个</ProgressLabel>
-            <span className="progress-value">{session.length} 个</span>
-          </Progress>
-        </div>
-        <section className="study-card">
-          <div className="study-meta">
-            <Badge variant="secondary">{currentWord?.group}</Badge>
-            <span>{currentWord?.status === 'new' ? '新词' : '复习'}</span>
+          <Button variant="ghost" onClick={closeSession}>
+            <ArrowLeft /> 退出本轮
+          </Button>
+          <div className="session-progress">
+            <Progress
+              value={
+                ((quizIndex + (checked ? 1 : 0)) / session.queue.length) * 100
+              }
+            />
+            <span>
+              {quizIndex + 1} / {session.queue.length}
+            </span>
           </div>
-          <button className="sound-button" onClick={() => currentWord && speak(currentWord.word)} aria-label="朗读单词">
+        </div>
+        <section
+          className={`spelling-card ${checked ? (isLatestCorrect ? 'answer-right' : 'answer-wrong') : ''}`}
+        >
+          <div className="study-meta">
+            <Badge variant="secondary">{chapter?.title ?? '自定义章节'}</Badge>
+            <span>
+              {session.type === 'missing' ? '缺字母测试' : '全单词测试'}
+            </span>
+          </div>
+          <button
+            className="sound-button"
+            onClick={() => speak(currentQuizWord.word)}
+            aria-label="播放单词发音"
+          >
             <Volume2 />
           </button>
-          <h1 className={settings.strategy === 'sound-first' && !revealed ? 'word-hidden' : ''}>{currentWord?.word}</h1>
-          <p className={`phonics-line ${settings.strategy === 'sound-first' && !revealed ? 'word-hidden' : ''}`}>{currentWord?.phonics}</p>
-          {!revealed ? (
-            <Button className="reveal-button" size="lg" onClick={() => setRevealed(true)}><CircleHelp /> 看意思与例句</Button>
+          <p className="meaning-prompt">{currentQuizWord.meaning}</p>
+          {session.type === 'missing' ? (
+            <div className="missing-word" aria-label="缺字母单词">
+              {missingPrompt?.mask}
+            </div>
           ) : (
-            <div className="answer-panel">
-              <strong>{currentWord?.meaning}</strong>
-              <p>{currentWord?.example}</p>
+            <div className="listen-prompt">
+              <Headphones />
+              <span>听一听，拼出完整单词</span>
+            </div>
+          )}
+          {!checked ? (
+            <form
+              className="answer-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                checkAnswer();
+              }}
+            >
+              <label htmlFor="spelling-answer">
+                {session.type === 'missing'
+                  ? '依次填写缺少的字母（不用空格）'
+                  : '输入完整单词'}
+              </label>
+              <Input
+                ref={answerRef}
+                id="spelling-answer"
+                autoComplete="off"
+                spellCheck={false}
+                value={quizInput}
+                onChange={(event) => setQuizInput(event.target.value)}
+                placeholder={
+                  session.type === 'missing' ? '填入空缺字母' : '在这里拼写'
+                }
+              />
+              <Button
+                type="submit"
+                className="primary-action"
+                disabled={!quizInput.trim()}
+              >
+                <Check /> 检查答案
+              </Button>
+            </form>
+          ) : (
+            <div className="answer-feedback">
+              <div className="feedback-title">
+                {isLatestCorrect ? <CheckCircle2 /> : <XCircle />}
+                <strong>
+                  {isLatestCorrect
+                    ? '拼对了！'
+                    : `正确答案：${currentQuizWord.word}`}
+                </strong>
+              </div>
+              <div className="word-details">
+                <span>
+                  <b>音标</b>
+                  {currentQuizWord.ipa || '未填写'}
+                </span>
+                <span>
+                  <b>拆分</b>
+                  {currentQuizWord.phonics || '未填写'}
+                </span>
+                <span>
+                  <b>例句</b>
+                  {currentQuizWord.example || '未填写'}
+                </span>
+              </div>
+              <Button className="primary-action" onClick={nextQuestion}>
+                {quizIndex < session.queue.length - 1 ? '下一题' : '查看成绩'}{' '}
+                <ChevronRight />
+              </Button>
             </div>
           )}
         </section>
-        {revealed && (
-          <div className="grade-row" aria-label="选择掌握程度">
-            <button className="grade again" onClick={() => gradeWord('again')}><RotateCcw /><span>没想起</span><small>明天再见</small></button>
-            <button className="grade hard" onClick={() => gradeWord('hard')}><Pause /><span>想了一会</span><small>稍后复习</small></button>
-            <button className="grade easy" onClick={() => gradeWord('easy')}><Sparkles /><span>马上认出</span><small>拉长间隔</small></button>
-          </div>
-        )}
       </main>
     );
   }
@@ -516,188 +1006,1023 @@ export default function Home() {
     <main className="app-shell">
       <header className="app-header">
         <div className="brand">
-          <div className="brand-mark"><span>p</span><span>h</span></div>
-          <div><strong>拼读小队</strong><small>单词工作台</small></div>
+          <div className="brand-mark">
+            <span>P</span>
+            <span>B</span>
+          </div>
+          <div>
+            <strong>拼读小队</strong>
+            <small>v0.8 拼写工作台</small>
+          </div>
         </div>
         <div className="header-status">
-          <span className="date-label">{weekday}</span>
-          <div className="streak"><Flame /> <strong>{completed}</strong><span>/ {displayGoal || 0} 今日</span></div>
+          <span className="date-label">
+            {new Intl.DateTimeFormat('zh-CN', {
+              month: 'long',
+              day: 'numeric',
+              weekday: 'long',
+            }).format(new Date())}
+          </span>
+          <span className="streak">
+            <Flame /> 今天完成 {completedToday} 题
+          </span>
         </div>
       </header>
+      <div className="workspace">
+        <Tabs value={tab} onValueChange={setTab}>
+          <TabsList variant="line" className="main-nav">
+            <TabsTrigger value="today">
+              <BookOpen /> 今日学习
+            </TabsTrigger>
+            <TabsTrigger value="test">
+              <Target /> 拼写测试
+            </TabsTrigger>
+            <TabsTrigger value="parent" className="parent-nav">
+              <ShieldCheck /> 设置与家长控制
+            </TabsTrigger>
+          </TabsList>
 
-      <Tabs value={tab} onValueChange={(value) => setTab(String(value))} className="workspace">
-        <TabsList className="main-nav" variant="line">
-          <TabsTrigger value="today"><CalendarDays />今日学习</TabsTrigger>
-          <TabsTrigger value="library"><Library />我的词库</TabsTrigger>
-          <TabsTrigger value="settings"><Settings2 />学习计划</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="today" className="dashboard-grid">
-          <section className="today-hero">
-            <div className="hero-copy">
-              <p className="eyebrow">TODAY · {strategyLabels[settings.strategy]}</p>
-              <h1>今天先听音，<br /><span>再把词拼出来。</span></h1>
-              <p className="hero-note">预计 {Math.max(6, Math.ceil(todayTotal * 0.7))} 分钟 · {Math.min(dueWords.length, settings.reviewPerDay)} 个复习 + {Math.min(newWords.length, settings.newPerDay)} 个新词</p>
-              <Button className="primary-action" size="lg" onClick={startSession} disabled={!todayTotal}>
-                <Play fill="currentColor" /> {completed ? '继续今天的学习' : '开始今天的学习'}
-              </Button>
-            </div>
-            <div className="progress-orbit" aria-label={`今日完成 ${completed}，计划 ${displayGoal}`}>
-              <div className="orbit-ring" style={{ '--progress': `${Math.min(100, displayGoal ? (completed / displayGoal) * 100 : 0) * 3.6}deg` } as React.CSSProperties}>
-                <div><strong>{completed}</strong><span>/ {displayGoal}</span><small>今日完成</small></div>
+          <TabsContent value="today">
+            <section className="dashboard-grid">
+              <div className="today-hero">
+                <div className="hero-copy">
+                  <p className="eyebrow">继续上次的学习顺序</p>
+                  <h1>{currentChapter?.title ?? 'v0.8 自然拼读'}</h1>
+                  <p className="chapter-note">{currentChapter?.childNote}</p>
+                  <div className="hero-actions">
+                    <Button className="primary-action" onClick={buildDailyQuiz}>
+                      <Play /> 开始今日顺序学习
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="dark-outline"
+                      onClick={() => {
+                        setTab('test');
+                        setQuizMode('chapter');
+                      }}
+                    >
+                      选择章节
+                    </Button>
+                  </div>
+                </div>
+                <div className="progress-orbit">
+                  <div
+                    className="orbit-ring"
+                    style={
+                      {
+                        '--progress': `${progressPercent}%`,
+                      } as React.CSSProperties
+                    }
+                  >
+                    <div>
+                      <strong>{completedToday}</strong>
+                      <span>/{settings.quizCount}</span>
+                      <small>今日拼写题</small>
+                    </div>
+                  </div>
+                  <span className="orbit-dot dot-one">a</span>
+                  <span className="orbit-dot dot-two">sh</span>
+                  <span className="orbit-dot dot-three">ee</span>
+                </div>
               </div>
-              <span className="orbit-dot dot-one">sh</span>
-              <span className="orbit-dot dot-two">ee</span>
-              <span className="orbit-dot dot-three">a</span>
-            </div>
-          </section>
-
-          <section className="panel focus-panel">
-            <div className="panel-heading">
-              <div><p className="eyebrow">PHONICS FOCUS</p><h2>今日拼读重点</h2></div>
-              <button onClick={() => setTab('library')}>查看词库 <ChevronRight /></button>
-            </div>
-            <div className="focus-list">
-              {(focusGroups.length ? focusGroups : [['短元音 a', 0], ['辅音组合 sh', 0]]).map(([group, count], index) => (
-                <button className="focus-item" key={group} onClick={() => { setGroupFilter(group as string); setTab('library'); }}>
-                  <span className={`focus-sound sound-${index + 1}`}>{String(group).match(/[a-z]+/i)?.[0] ?? '音'}</span>
-                  <span><strong>{group}</strong><small>{count} 个今日单词</small></span>
-                  <ChevronRight />
-                </button>
-              ))}
-            </div>
-          </section>
-
-          <section className="panel review-panel">
-            <div className="panel-heading"><div><p className="eyebrow">REVIEW RADAR</p><h2>复习雷达</h2></div><Clock3 /></div>
-            <div className="radar-count"><strong>{dueWords.length}</strong><span>个词今天到期</span></div>
-            <div className="mini-bars" aria-hidden="true">
-              {[42, 68, 56, 88, 64, 36, 52].map((height, index) => <i key={index} style={{ height: `${height}%` }} />)}
-            </div>
-            <div className="legend"><span><i className="orange" />待复习</span><span><i className="blue" />已完成</span></div>
-          </section>
-
-          <section className="panel stats-panel">
-            <div className="stat"><BookOpen /><span><strong>{words.length}</strong><small>词库总量</small></span></div>
-            <div className="stat"><ListRestart /><span><strong>{learningCount}</strong><small>正在学习</small></span></div>
-            <div className="stat"><Sparkles /><span><strong>{masteredCount}</strong><small>已经掌握</small></span></div>
-          </section>
-        </TabsContent>
-
-        <TabsContent value="library" className="library-view">
-          <div className="page-title-row">
-            <div><p className="eyebrow">WORD LIBRARY</p><h1>我的词库</h1><p>词库调整后，明天的学习计划会自动重排。</p></div>
-            <div className="title-actions">
-              <input ref={importRef} type="file" accept="application/json" hidden onChange={(event) => importFile(event.target.files?.[0])} />
-              <Button variant="outline" onClick={() => importRef.current?.click()}><Upload />恢复</Button>
-              <Button variant="outline" onClick={exportWords}><Download />备份</Button>
-              <WordDialog editingWord={editingWord} setEditingWord={setEditingWord} onSave={saveWord} />
-            </div>
-          </div>
-
-          <section className="library-toolbar">
-            <div className="search-box"><Search /><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索单词、中文或拼读拆分" /></div>
-            <Select value={groupFilter} onValueChange={(value) => setGroupFilter(String(value))}>
-              <SelectTrigger className="group-select"><SelectValue placeholder="全部拼读组" /></SelectTrigger>
-              <SelectContent><SelectItem value="all">全部拼读组</SelectItem>{groups.map((group) => <SelectItem value={group} key={group}>{group}</SelectItem>)}</SelectContent>
-            </Select>
-            <Dialog>
-              <DialogTrigger render={<Button variant="outline" />}><Plus />批量粘贴</DialogTrigger>
-              <DialogContent className="bulk-dialog">
-                <DialogHeader><DialogTitle>批量加入单词</DialogTitle><DialogDescription>每行一个词，按“英文，中文，拼读拆分，拼读组，例句”排列。后面三项可以不填。</DialogDescription></DialogHeader>
-                <Textarea value={bulkText} onChange={(event) => setBulkText(event.target.value)} rows={9} placeholder={'ship，船，sh · i · p，短元音 i / sh，The ship is big.\nrain，雨，r · ai · n，元音组合 ai'} />
-                <DialogFooter><DialogClose render={<Button variant="outline" />}>取消</DialogClose><DialogClose render={<Button onClick={importBulk} />}>导入词库</DialogClose></DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </section>
-
-          <div className="word-table" role="table" aria-label="单词列表">
-            <div className="word-row word-head" role="row"><span>单词 / 拼读</span><span>中文 / 例句</span><span>拼读组</span><span>状态</span><span>启用</span><span></span></div>
-            {filteredWords.map((word) => (
-              <div className="word-row" role="row" key={word.id}>
-                <span className="word-cell"><strong>{word.word}</strong><small>{word.phonics}</small></span>
-                <span className="meaning-cell"><strong>{word.meaning}</strong><small>{word.example || '还没有例句'}</small></span>
-                <span><Badge variant="secondary">{word.group}</Badge></span>
-                <span><i className={`status-dot ${word.status}`} />{statusLabels[word.status]}</span>
-                <span><Switch checked={word.active} onCheckedChange={(checked) => setWords((items) => items.map((item) => item.id === word.id ? { ...item, active: Boolean(checked) } : item))} aria-label={`${word.word}是否启用`} /></span>
-                <span className="row-actions">
-                  <Button size="icon-sm" variant="ghost" aria-label={`编辑${word.word}`} onClick={() => setEditingWord(word)}><Pencil /></Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger render={<Button size="icon-sm" variant="ghost" aria-label={`删除${word.word}`} />}><Trash2 /></AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader><AlertDialogTitle>从词库删除“{word.word}”？</AlertDialogTitle><AlertDialogDescription>这个单词的学习记录也会一起删除。若之前做过备份，可以从备份文件恢复。</AlertDialogDescription></AlertDialogHeader>
-                      <AlertDialogFooter><AlertDialogCancel>保留</AlertDialogCancel><AlertDialogAction variant="destructive" onClick={() => setWords((items) => items.filter((item) => item.id !== word.id))}>删除</AlertDialogAction></AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </span>
+              <aside className="panel next-word-panel">
+                <div className="panel-heading">
+                  <div>
+                    <p className="eyebrow">下一词</p>
+                    <h2>{currentLearningWord?.word ?? '—'}</h2>
+                  </div>
+                  <button
+                    onClick={() =>
+                      currentLearningWord && speak(currentLearningWord.word)
+                    }
+                  >
+                    <Volume2 />
+                  </button>
+                </div>
+                <p className="next-meaning">{currentLearningWord?.meaning}</p>
+                <div className="mini-detail">
+                  <span>{currentLearningWord?.ipa}</span>
+                  <span>{currentLearningWord?.phonics}</span>
+                </div>
+                <p>{currentLearningWord?.example}</p>
+              </aside>
+              <div className="panel stats-panel">
+                <div className="stat">
+                  <Library />
+                  <div>
+                    <strong>{words.length}</strong>
+                    <small>v0.8 总词条</small>
+                  </div>
+                </div>
+                <div className="stat">
+                  <BookMarked />
+                  <div>
+                    <strong>{chapters.length}</strong>
+                    <small>学习章节</small>
+                  </div>
+                </div>
+                <div className="stat">
+                  <ListChecks />
+                  <div>
+                    <strong>{learningCount + masteredCount}</strong>
+                    <small>已经练过</small>
+                  </div>
+                </div>
+                <div className="stat">
+                  <RotateCcw />
+                  <div>
+                    <strong>{dueWords.length}</strong>
+                    <small>今天待复习</small>
+                  </div>
+                </div>
               </div>
-            ))}
-            {!filteredWords.length && <div className="empty-row">没有找到匹配的单词。</div>}
-          </div>
-          {editingWord && <WordDialog editingWord={editingWord} setEditingWord={setEditingWord} onSave={saveWord} controlled />}
-        </TabsContent>
+              <div className="panel current-rule">
+                <div className="panel-heading">
+                  <h2>本章标题与备注</h2>
+                  <CircleHelp />
+                </div>
+                <p>
+                  <strong>规则：</strong>
+                  {currentChapter?.rule}
+                </p>
+                <p>
+                  <strong>给孩子：</strong>
+                  {currentChapter?.childNote}
+                </p>
+              </div>
+              <div className="panel parent-shortcut">
+                <ShieldCheck />
+                <div>
+                  <h2>家长要改词库？</h2>
+                  <p>增删单词、调整章节、每日数量和备份，都集中在家长控制。</p>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setTab('parent');
+                    setParentTab('library');
+                  }}
+                >
+                  打开家长控制
+                </Button>
+              </div>
+            </section>
+          </TabsContent>
 
-        <TabsContent value="settings" className="settings-view">
-          <div className="page-title-row"><div><p className="eyebrow">STUDY PLAN</p><h1>学习计划</h1><p>先把节奏调舒服。设置会保存在这台设备上。</p></div></div>
-          <div className="settings-grid">
-            <section className="settings-card">
-              <div className="setting-icon orange-bg"><Plus /></div>
-              <div className="setting-copy"><h2>每天新学</h2><p>从未学词里按词库顺序抽取</p></div>
-              <strong className="setting-value">{settings.newPerDay}<small> 个词</small></strong>
-              <Slider min={0} max={20} step={1} value={[settings.newPerDay]} onValueChange={(value) => setSettings((item) => ({ ...item, newPerDay: sliderFirst(value) }))} aria-label="每天新学单词数" />
-              <div className="range-label"><span>0</span><span>20</span></div>
+          <TabsContent value="test">
+            <section className="test-center">
+              <div className="page-title-row">
+                <div>
+                  <p className="eyebrow">SPELLING TEST</p>
+                  <h1>拼写测试中心</h1>
+                  <p>
+                    先选测试范围，再选缺字母或完整拼写。初始默认按学习顺序。
+                  </p>
+                </div>
+              </div>
+              {quizMessage && (
+                <div className="notice-banner">{quizMessage}</div>
+              )}
+              <div className="test-section">
+                <div className="section-number">1</div>
+                <div className="section-copy">
+                  <h2>测试范围</h2>
+                  <p>“按学习顺序”与“选择章节”都不打乱词序。</p>
+                </div>
+                <div className="choice-grid three">
+                  {(Object.keys(modeInfo) as QuizMode[]).map((mode) => (
+                    <button
+                      key={mode}
+                      className={`choice-card ${quizMode === mode ? 'selected' : ''}`}
+                      onClick={() => setQuizMode(mode)}
+                    >
+                      {mode === 'sequence' ? (
+                        <ListChecks />
+                      ) : mode === 'chapter' ? (
+                        <BookMarked />
+                      ) : (
+                        <Shuffle />
+                      )}
+                      <strong>{modeInfo[mode].title}</strong>
+                      <span>{modeInfo[mode].description}</span>
+                      {quizMode === mode && (
+                        <CheckCircle2 className="selected-check" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {quizMode === 'chapter' && (
+                <div className="chapter-picker panel">
+                  <div className="panel-heading">
+                    <div>
+                      <h2>选择测试章节</h2>
+                      <p>可同时选择多个章节，测试时按章节原顺序进行。</p>
+                    </div>
+                    <Badge variant="secondary">
+                      已选 {selectedChapters.length} 章
+                    </Badge>
+                  </div>
+                  <div className="chapter-checks">
+                    {orderedChapters.map((chapter) => (
+                      <label
+                        key={chapter.id}
+                        className={
+                          selectedChapters.includes(chapter.id) ? 'checked' : ''
+                        }
+                      >
+                        <Checkbox
+                          checked={selectedChapters.includes(chapter.id)}
+                          onCheckedChange={(value) =>
+                            setSelectedChapters((current) =>
+                              value
+                                ? [...new Set([...current, chapter.id])]
+                                : current.filter((id) => id !== chapter.id),
+                            )
+                          }
+                        />
+                        <span>
+                          <strong>{chapter.title}</strong>
+                          <small>
+                            {
+                              words.filter(
+                                (word) =>
+                                  word.chapterId === chapter.id && word.active,
+                              ).length
+                            }{' '}
+                            个启用词
+                          </small>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="test-section">
+                <div className="section-number">2</div>
+                <div className="section-copy">
+                  <h2>拼写方式</h2>
+                  <p>初期建议缺字母；熟悉后切换到完整单词。</p>
+                </div>
+                <div className="choice-grid two">
+                  {(Object.keys(typeInfo) as QuizType[]).map((type) => (
+                    <button
+                      key={type}
+                      className={`choice-card ${quizType === type ? 'selected' : ''}`}
+                      onClick={() => setQuizType(type)}
+                    >
+                      {type === 'missing' ? <Pencil /> : <Headphones />}
+                      <strong>{typeInfo[type].title}</strong>
+                      <span>{typeInfo[type].description}</span>
+                      {quizType === type && (
+                        <CheckCircle2 className="selected-check" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="test-launch panel">
+                <div>
+                  <p className="eyebrow">准备好了</p>
+                  <h2>
+                    {modeInfo[quizMode].title} · {typeInfo[quizType].title}
+                  </h2>
+                  <p>
+                    本轮 {launchCount} 题
+                    {quizMode === 'chapter'
+                      ? '，覆盖所选章节中的全部启用词。'
+                      : '，可在家长控制中调整。'}
+                  </p>
+                </div>
+                <Button className="primary-action" onClick={() => buildQuiz()}>
+                  <Play /> 开始测试
+                </Button>
+              </div>
             </section>
-            <section className="settings-card">
-              <div className="setting-icon blue-bg"><ListRestart /></div>
-              <div className="setting-copy"><h2>每天复习上限</h2><p>到期词太多时分批完成</p></div>
-              <strong className="setting-value">{settings.reviewPerDay}<small> 个词</small></strong>
-              <Slider min={5} max={40} step={1} value={[settings.reviewPerDay]} onValueChange={(value) => setSettings((item) => ({ ...item, reviewPerDay: sliderFirst(value) }))} aria-label="每天复习单词上限" />
-              <div className="range-label"><span>5</span><span>40</span></div>
+          </TabsContent>
+
+          <TabsContent value="parent">
+            <section className="parent-view">
+              <div className="parent-hero">
+                <div className="parent-icon">
+                  <ShieldCheck />
+                </div>
+                <div>
+                  <p className="eyebrow">PARENT CONTROL</p>
+                  <h1>设置与家长控制</h1>
+                  <p>
+                    所有可调整内容都在这里：学习计划、章节备注、词库增删、测试默认方式和备份。
+                  </p>
+                </div>
+                <Badge>家长入口</Badge>
+              </div>
+              <Tabs value={parentTab} onValueChange={setParentTab}>
+                <TabsList className="parent-tabs">
+                  <TabsTrigger value="plan">
+                    <Settings2 /> 学习与测试设置
+                  </TabsTrigger>
+                  <TabsTrigger value="library">
+                    <Library /> 词库与章节管理
+                  </TabsTrigger>
+                  <TabsTrigger value="backup">
+                    <FileJson /> 数据备份
+                  </TabsTrigger>
+                </TabsList>
+                <TabsContent value="plan">
+                  <div className="settings-grid">
+                    <div className="settings-card">
+                      <div className="setting-icon orange-bg">
+                        <BookOpen />
+                      </div>
+                      <div className="setting-copy">
+                        <h2>每天新词</h2>
+                        <p>今日学习中引入的新词数量</p>
+                      </div>
+                      <strong className="setting-value">
+                        {settings.newPerDay}
+                        <small> 个</small>
+                      </strong>
+                      <Slider
+                        min={0}
+                        max={30}
+                        step={1}
+                        value={settings.newPerDay}
+                        onValueChange={(value) =>
+                          setSettings((current) => ({
+                            ...current,
+                            newPerDay: Number(value),
+                          }))
+                        }
+                      />
+                      <div className="range-label">
+                        <span>0</span>
+                        <span>30</span>
+                      </div>
+                    </div>
+                    <div className="settings-card">
+                      <div className="setting-icon blue-bg">
+                        <RotateCcw />
+                      </div>
+                      <div className="setting-copy">
+                        <h2>每天复习</h2>
+                        <p>每天最多安排的复习词数量</p>
+                      </div>
+                      <strong className="setting-value">
+                        {settings.reviewPerDay}
+                        <small> 个</small>
+                      </strong>
+                      <Slider
+                        min={0}
+                        max={50}
+                        step={1}
+                        value={settings.reviewPerDay}
+                        onValueChange={(value) =>
+                          setSettings((current) => ({
+                            ...current,
+                            reviewPerDay: Number(value),
+                          }))
+                        }
+                      />
+                      <div className="range-label">
+                        <span>0</span>
+                        <span>50</span>
+                      </div>
+                    </div>
+                    <div className="settings-card wide default-test-settings">
+                      <div className="setting-icon violet-bg">
+                        <Target />
+                      </div>
+                      <div className="setting-copy">
+                        <h2>默认拼写测试</h2>
+                        <p>孩子打开测试中心时优先使用这里的方式</p>
+                      </div>
+                      <div className="inline-fields">
+                        <label>
+                          范围
+                          <Select
+                            value={settings.defaultQuizMode}
+                            onValueChange={(value) => {
+                              if (!value) return;
+                              const mode = value as QuizMode;
+                              setSettings((current) => ({
+                                ...current,
+                                defaultQuizMode: mode,
+                              }));
+                              setQuizMode(mode);
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(Object.keys(modeInfo) as QuizMode[]).map(
+                                (mode) => (
+                                  <SelectItem key={mode} value={mode}>
+                                    {modeInfo[mode].title}
+                                  </SelectItem>
+                                ),
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </label>
+                        <label>
+                          题型
+                          <Select
+                            value={settings.defaultQuizType}
+                            onValueChange={(value) => {
+                              if (!value) return;
+                              const type = value as QuizType;
+                              setSettings((current) => ({
+                                ...current,
+                                defaultQuizType: type,
+                              }));
+                              setQuizType(type);
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(Object.keys(typeInfo) as QuizType[]).map(
+                                (type) => (
+                                  <SelectItem key={type} value={type}>
+                                    {typeInfo[type].title}
+                                  </SelectItem>
+                                ),
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </label>
+                        <label>
+                          每轮题数
+                          <Select
+                            value={String(settings.quizCount)}
+                            onValueChange={(value) => {
+                              if (!value) return;
+                              setSettings((current) => ({
+                                ...current,
+                                quizCount: Number(value),
+                              }));
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {[5, 10, 15, 20, 30, 50].map((count) => (
+                                <SelectItem key={count} value={String(count)}>
+                                  {count} 题
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </label>
+                      </div>
+                    </div>
+                    <div className="settings-card wide toggle-card">
+                      <div>
+                        <h2>进入题目自动读音</h2>
+                        <p>也可随时点击扬声器重复播放</p>
+                      </div>
+                      <Switch
+                        checked={settings.autoSpeak}
+                        onCheckedChange={(value) =>
+                          setSettings((current) => ({
+                            ...current,
+                            autoSpeak: value,
+                          }))
+                        }
+                      />
+                    </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="library">
+                  <div className="library-summary">
+                    <div>
+                      <p className="eyebrow">当前词库</p>
+                      <h2>自然拼读背单词小手册 · v0.8</h2>
+                      <p>
+                        {chapters.length} 个章节 · {words.length} 条词条 ·{' '}
+                        {activeWords.length} 条已启用
+                      </p>
+                    </div>
+                    <div className="title-actions">
+                      <Button
+                        variant="outline"
+                        onClick={() => setBulkOpen(true)}
+                      >
+                        <Upload /> 批量增加
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          if (!activeParentChapter) return;
+                          setIsNewWord(true);
+                          setDraftWord({
+                            ...makeBlankWord(activeParentChapter),
+                            wordOrder:
+                              Math.max(
+                                0,
+                                ...words
+                                  .filter(
+                                    (word) =>
+                                      word.chapterId === activeParentChapter.id,
+                                  )
+                                  .map((word) => word.wordOrder),
+                              ) + 1,
+                          });
+                        }}
+                      >
+                        <Plus /> 新增单词
+                      </Button>
+                    </div>
+                  </div>
+                  <section className="chapter-editor panel">
+                    <div className="panel-heading">
+                      <div>
+                        <h2>章节标题与备注</h2>
+                        <p>
+                          这里可以改 short a
+                          等章节标题、规则说明和给孩子的讲法。
+                        </p>
+                      </div>
+                      <Button variant="outline" onClick={addChapter}>
+                        <Plus /> 新建章节
+                      </Button>
+                    </div>
+                    {activeParentChapter && (
+                      <div className="chapter-editor-grid">
+                        <label>
+                          选择章节
+                          <Select
+                            value={activeParentChapter.id}
+                            onValueChange={(value) =>
+                              value && setParentChapterId(value)
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {orderedChapters.map((chapter) => (
+                                <SelectItem key={chapter.id} value={chapter.id}>
+                                  {chapter.title}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </label>
+                        <label>
+                          章节顺序
+                          <Input
+                            type="number"
+                            min={1}
+                            value={activeParentChapter.order}
+                            onChange={(event) => {
+                              const order = Math.max(
+                                1,
+                                Number(event.target.value) || 1,
+                              );
+                              setChapters((items) =>
+                                items.map((chapter) =>
+                                  chapter.id === activeParentChapter.id
+                                    ? { ...chapter, order }
+                                    : chapter,
+                                ),
+                              );
+                              setWords((items) =>
+                                items.map((word) =>
+                                  word.chapterId === activeParentChapter.id
+                                    ? { ...word, chapterOrder: order }
+                                    : word,
+                                ),
+                              );
+                            }}
+                          />
+                        </label>
+                        <label className="full">
+                          章节标题
+                          <Input
+                            value={activeParentChapter.title}
+                            onChange={(event) =>
+                              setChapters((items) =>
+                                items.map((chapter) =>
+                                  chapter.id === activeParentChapter.id
+                                    ? { ...chapter, title: event.target.value }
+                                    : chapter,
+                                ),
+                              )
+                            }
+                          />
+                        </label>
+                        <label className="full">
+                          规则说明
+                          <Textarea
+                            value={activeParentChapter.rule}
+                            onChange={(event) =>
+                              setChapters((items) =>
+                                items.map((chapter) =>
+                                  chapter.id === activeParentChapter.id
+                                    ? { ...chapter, rule: event.target.value }
+                                    : chapter,
+                                ),
+                              )
+                            }
+                          />
+                        </label>
+                        <label className="full">
+                          给孩子的讲法
+                          <Textarea
+                            value={activeParentChapter.childNote}
+                            onChange={(event) =>
+                              setChapters((items) =>
+                                items.map((chapter) =>
+                                  chapter.id === activeParentChapter.id
+                                    ? {
+                                        ...chapter,
+                                        childNote: event.target.value,
+                                      }
+                                    : chapter,
+                                ),
+                              )
+                            }
+                          />
+                        </label>
+                      </div>
+                    )}
+                  </section>
+                  <div className="library-toolbar">
+                    <div className="search-box">
+                      <Search />
+                      <Input
+                        placeholder="搜索英文、中文、音标或拆分"
+                        value={query}
+                        onChange={(event) => setQuery(event.target.value)}
+                      />
+                    </div>
+                    <Select
+                      value={chapterFilter}
+                      onValueChange={(value) =>
+                        value && setChapterFilter(value)
+                      }
+                    >
+                      <SelectTrigger className="chapter-filter">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">全部章节</SelectItem>
+                        {orderedChapters.map((chapter) => (
+                          <SelectItem key={chapter.id} value={chapter.id}>
+                            {chapter.title}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Badge variant="secondary">
+                      找到 {filteredWords.length} 条
+                    </Badge>
+                  </div>
+                  <div className="word-table">
+                    <div className="word-row word-head">
+                      <span>单词 / 音标</span>
+                      <span>中文 / 例句</span>
+                      <span>拆分</span>
+                      <span>章节</span>
+                      <span>测试</span>
+                      <span>操作</span>
+                    </div>
+                    {visibleWords.map((word) => {
+                      const chapter = chapters.find(
+                        (item) => item.id === word.chapterId,
+                      );
+                      return (
+                        <div className="word-row" key={word.id}>
+                          <span className="word-cell">
+                            <strong>{word.word}</strong>
+                            <small>{word.ipa || '暂无音标'}</small>
+                          </span>
+                          <span className="meaning-cell">
+                            <strong>{word.meaning}</strong>
+                            <small>{word.example || '暂无例句'}</small>
+                          </span>
+                          <span className="phonics-cell">
+                            {word.phonics || '—'}
+                            <small>{word.level}</small>
+                          </span>
+                          <span className="chapter-cell" title={chapter?.title}>
+                            {chapter?.title ?? '未分组'}
+                          </span>
+                          <Switch
+                            checked={word.active}
+                            onCheckedChange={(value) =>
+                              setWords((items) =>
+                                items.map((item) =>
+                                  item.id === word.id
+                                    ? { ...item, active: value }
+                                    : item,
+                                ),
+                              )
+                            }
+                            aria-label={`在测试中${word.active ? '停用' : '启用'} ${word.word}`}
+                          />
+                          <span className="row-actions">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setIsNewWord(false);
+                                setDraftWord({ ...word });
+                              }}
+                              aria-label={`编辑 ${word.word}`}
+                            >
+                              <Pencil />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger
+                                render={
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    aria-label={`删除 ${word.word}`}
+                                  />
+                                }
+                              >
+                                <Trash2 />
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>
+                                    删除 “{word.word}”？
+                                  </AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    这个词条会从词库和后续测试中移除。
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>取消</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() =>
+                                      setWords((items) =>
+                                        items.filter(
+                                          (item) => item.id !== word.id,
+                                        ),
+                                      )
+                                    }
+                                  >
+                                    确认删除
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </span>
+                        </div>
+                      );
+                    })}
+                    {!visibleWords.length && (
+                      <div className="empty-row">没有符合条件的词条。</div>
+                    )}
+                  </div>
+                  <div className="pagination-row">
+                    <Button
+                      variant="outline"
+                      disabled={wordPage <= 1}
+                      onClick={() => setWordPage((page) => page - 1)}
+                    >
+                      <ChevronLeft /> 上一页
+                    </Button>
+                    <span>
+                      第 {wordPage} / {totalPages} 页
+                    </span>
+                    <Button
+                      variant="outline"
+                      disabled={wordPage >= totalPages}
+                      onClick={() => setWordPage((page) => page + 1)}
+                    >
+                      下一页 <ChevronRight />
+                    </Button>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="backup">
+                  <div className="backup-grid">
+                    <section className="backup-card">
+                      <div className="backup-icon blue-bg">
+                        <Download />
+                      </div>
+                      <h2>导出完整备份</h2>
+                      <p>
+                        保存章节标题、全部词条、中文词义、学习进度和家长设置。换设备前建议先导出。
+                      </p>
+                      <Button onClick={exportBackup}>
+                        <Download /> 下载 JSON 备份
+                      </Button>
+                    </section>
+                    <section className="backup-card">
+                      <div className="backup-icon violet-bg">
+                        <Upload />
+                      </div>
+                      <h2>恢复已有备份</h2>
+                      <p>选择本工作台导出的 JSON 文件，恢复词库和设置。</p>
+                      <input
+                        ref={importRef}
+                        type="file"
+                        accept="application/json"
+                        hidden
+                        onChange={importBackup}
+                      />
+                      <Button
+                        variant="outline"
+                        onClick={() => importRef.current?.click()}
+                      >
+                        <Upload /> 选择备份文件
+                      </Button>
+                    </section>
+                    <section className="backup-card danger-card">
+                      <div className="backup-icon orange-bg">
+                        <RotateCcw />
+                      </div>
+                      <h2>恢复 v0.8 原始词库</h2>
+                      <p>
+                        会清除当前增删修改和学习进度，回到本次导入的 33
+                        章、1,785 条词。
+                      </p>
+                      <AlertDialog>
+                        <AlertDialogTrigger
+                          render={<Button variant="outline" />}
+                        >
+                          <RotateCcw /> 恢复原始词库
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>
+                              确定恢复 v0.8 原始词库？
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                              当前词库修改会被覆盖。建议先导出备份。
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>取消</AlertDialogCancel>
+                            <AlertDialogAction onClick={resetToV08}>
+                              确认恢复
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </section>
+                  </div>
+                </TabsContent>
+              </Tabs>
             </section>
-            <section className="settings-card wide">
-              <div className="setting-icon violet-bg"><Clock3 /></div>
-              <div className="setting-copy"><h2>复习方式</h2><p>回答“没想起 / 想了一会 / 马上认出”后，系统自动调整下次出现时间。</p></div>
-              <Select value={settings.strategy} onValueChange={(value) => setSettings((item) => ({ ...item, strategy: value as ReviewStrategy }))}>
-                <SelectTrigger className="strategy-select"><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="spaced">间隔复习 · 先复习后新词</SelectItem><SelectItem value="mixed">新旧混合 · 交替出现</SelectItem><SelectItem value="sound-first">先听后认 · 先隐藏拼写</SelectItem></SelectContent>
-              </Select>
-            </section>
-            <section className="settings-card toggle-card">
-              <div><h2>自动朗读</h2><p>进入每张单词卡时自动读一遍</p></div>
-              <Switch checked={settings.autoSpeak} onCheckedChange={(checked) => setSettings((item) => ({ ...item, autoSpeak: Boolean(checked) }))} aria-label="自动朗读" />
-            </section>
-          </div>
-          <section className="plan-preview">
-            <div><p className="eyebrow">NEXT SESSION</p><h2>按当前设置，下一次约 {Math.max(6, Math.ceil((settings.newPerDay + settings.reviewPerDay) * 0.7))} 分钟</h2></div>
-            <div className="plan-chips"><span>{settings.reviewPerDay} 个复习</span><i>+</i><span>{settings.newPerDay} 个新词</span><i>·</i><span>{strategyLabels[settings.strategy]}</span></div>
-          </section>
-        </TabsContent>
-      </Tabs>
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      <Dialog
+        open={Boolean(draftWord)}
+        onOpenChange={(open) => !open && setDraftWord(null)}
+      >
+        <DialogContent className="word-dialog">
+          <DialogHeader>
+            <DialogTitle>
+              {isNewWord ? '新增单词' : `编辑 ${draftWord?.word}`}
+            </DialogTitle>
+            <DialogDescription>
+              英文和中文词义为必填；音标、拆分与例句会在答题后展示。
+            </DialogDescription>
+          </DialogHeader>
+          {draftWord && (
+            <div className="word-form">
+              <label>
+                英文单词
+                <Input
+                  value={draftWord.word}
+                  onChange={(event) =>
+                    setDraftWord({ ...draftWord, word: event.target.value })
+                  }
+                />
+              </label>
+              <label>
+                中文词义
+                <Input
+                  value={draftWord.meaning}
+                  onChange={(event) =>
+                    setDraftWord({ ...draftWord, meaning: event.target.value })
+                  }
+                />
+              </label>
+              <label>
+                音标
+                <Input
+                  value={draftWord.ipa}
+                  onChange={(event) =>
+                    setDraftWord({ ...draftWord, ipa: event.target.value })
+                  }
+                  placeholder="例如 /kæt/"
+                />
+              </label>
+              <label>
+                单词拆分
+                <Input
+                  value={draftWord.phonics}
+                  onChange={(event) =>
+                    setDraftWord({ ...draftWord, phonics: event.target.value })
+                  }
+                  placeholder="例如 c + a + t"
+                />
+              </label>
+              <label className="full">
+                所属章节
+                <Select
+                  value={draftWord.chapterId}
+                  onValueChange={(value) =>
+                    value && setDraftWord({ ...draftWord, chapterId: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {orderedChapters.map((chapter) => (
+                      <SelectItem key={chapter.id} value={chapter.id}>
+                        {chapter.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </label>
+              <label className="full">
+                简短例句
+                <Input
+                  value={draftWord.example}
+                  onChange={(event) =>
+                    setDraftWord({ ...draftWord, example: event.target.value })
+                  }
+                />
+              </label>
+              <label>
+                分层
+                <Input
+                  value={draftWord.level}
+                  onChange={(event) =>
+                    setDraftWord({ ...draftWord, level: event.target.value })
+                  }
+                />
+              </label>
+              <label>
+                章节内顺序
+                <Input
+                  type="number"
+                  min={1}
+                  value={draftWord.wordOrder}
+                  onChange={(event) =>
+                    setDraftWord({
+                      ...draftWord,
+                      wordOrder: Math.max(1, Number(event.target.value) || 1),
+                    })
+                  }
+                />
+              </label>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDraftWord(null)}>
+              取消
+            </Button>
+            <Button
+              onClick={saveDraftWord}
+              disabled={!draftWord?.word.trim() || !draftWord?.meaning.trim()}
+            >
+              保存词条
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
+        <DialogContent className="bulk-dialog">
+          <DialogHeader>
+            <DialogTitle>批量增加到“{activeParentChapter?.title}”</DialogTitle>
+            <DialogDescription>
+              每行一个词，依次填写：英文，中文，音标，拆分，例句，分层。可用逗号或制表符分隔。
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={bulkText}
+            onChange={(event) => setBulkText(event.target.value)}
+            placeholder={
+              'cat，猫，/kæt/，c + a + t，I see a cat.，简单\ndog，狗，/dɒɡ/，d + o + g，I see a dog.，简单'
+            }
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkOpen(false)}>
+              取消
+            </Button>
+            <Button onClick={importBulkWords} disabled={!bulkText.trim()}>
+              确认加入
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   );
-}
-
-function WordDialog({ editingWord, setEditingWord, onSave, controlled = false }: {
-  editingWord: Word | null;
-  setEditingWord: (word: Word | null) => void;
-  onSave: (event: React.FormEvent<HTMLFormElement>) => void;
-  controlled?: boolean;
-}) {
-  const content = (
-    <DialogContent className="word-dialog">
-      <form onSubmit={onSave}>
-        <DialogHeader><DialogTitle>{editingWord ? '编辑单词' : '加入一个单词'}</DialogTitle><DialogDescription>拼读拆分建议按发音单位填写，例如 sh · i · p。</DialogDescription></DialogHeader>
-        <div className="form-grid">
-          <label>英文<Input name="word" defaultValue={editingWord?.word} placeholder="ship" required autoFocus /></label>
-          <label>中文<Input name="meaning" defaultValue={editingWord?.meaning} placeholder="船" required /></label>
-          <label className="full">拼读拆分<Input name="phonics" defaultValue={editingWord?.phonics} placeholder="sh · i · p" /></label>
-          <label className="full">拼读组<Input name="group" defaultValue={editingWord?.group} placeholder="短元音 i / sh" /></label>
-          <label className="full">例句<Input name="example" defaultValue={editingWord?.example} placeholder="The ship is big." /></label>
-        </div>
-        <DialogFooter><DialogClose render={<Button type="button" variant="outline" onClick={() => setEditingWord(null)} />}>取消</DialogClose><DialogClose render={<Button type="submit" />}>保存到词库</DialogClose></DialogFooter>
-      </form>
-    </DialogContent>
-  );
-  if (controlled) return <Dialog open onOpenChange={(open) => !open && setEditingWord(null)}>{content}</Dialog>;
-  return <Dialog><DialogTrigger render={<Button />}><Plus />加入单词</DialogTrigger>{content}</Dialog>;
 }
