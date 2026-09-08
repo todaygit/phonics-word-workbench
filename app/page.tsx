@@ -68,6 +68,15 @@ import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Sidebar,
+  SidebarProvider,
+  SidebarHeader,
+  SidebarContent,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+} from '@/components/ui/sidebar';
 
 type WordStatus = 'new' | 'learning' | 'mastered';
 type QuizMode = 'sequence' | 'chapter' | 'random';
@@ -281,6 +290,7 @@ export default function Home() {
   const [words, setWords] = useState<Word[]>(DEFAULT_WORDS);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [tab, setTab] = useState('today');
+  const [parentOpen, setParentOpen] = useState(false);
   const [parentTab, setParentTab] = useState('plan');
   const [hydrated, setHydrated] = useState(false);
   const [sequenceCursor, setSequenceCursor] = useState(0);
@@ -508,7 +518,8 @@ export default function Home() {
           ...current,
           ...(input as Partial<Settings>),
         }));
-        setTab('parent');
+        setTab('settings');
+        setParentOpen(true);
         setParentTab('plan');
         return { updated: true };
       },
@@ -562,7 +573,8 @@ export default function Home() {
               ) + 1,
           },
         ]);
-        setTab('parent');
+        setTab('settings');
+        setParentOpen(true);
         setParentTab('library');
         return { added: addition.word, chapter: chapter.title };
       },
@@ -1003,46 +1015,70 @@ export default function Home() {
   }
 
   return (
-    <main className="app-shell">
-      <header className="app-header">
-        <div className="brand">
-          <div className="brand-mark">
-            <span>P</span>
-            <span>B</span>
+    <SidebarProvider className="app-shell">
+      <Sidebar collapsible="none" className="app-sidebar">
+        <SidebarHeader className="sidebar-brand">
+          <div className="brand">
+            <div className="brand-mark">
+              <span>P</span>
+              <span>B</span>
+            </div>
+            <div>
+              <strong>拼读小队</strong>
+              <small>v0.8 拼写工作台</small>
+            </div>
           </div>
-          <div>
-            <strong>拼读小队</strong>
-            <small>v0.8 拼写工作台</small>
+        </SidebarHeader>
+        <SidebarContent>
+          <nav aria-label="主导航">
+            <SidebarMenu className="app-navigation">
+              {[
+                { value: 'today', label: '今日学习', icon: BookOpen },
+                { value: 'test', label: '拼写测试', icon: Target },
+                { value: 'settings', label: '设置', icon: Settings2 },
+              ].map(({ value, label, icon: Icon }) => (
+                <SidebarMenuItem key={value}>
+                  <SidebarMenuButton
+                    isActive={tab === value}
+                    aria-current={tab === value ? 'page' : undefined}
+                    onClick={() => {
+                      setTab(value);
+                      if (value === 'settings') setParentOpen(false);
+                    }}
+                  >
+                    <Icon />
+                    <span>{label}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </nav>
+        </SidebarContent>
+      </Sidebar>
+      <div className="app-main">
+        <header className="app-header">
+          <span className="header-location">
+            {tab === 'today'
+              ? '今日学习'
+              : tab === 'test'
+                ? '拼写测试'
+                : '设置'}
+          </span>
+          <div className="header-status">
+            <span className="date-label">
+              {new Intl.DateTimeFormat('zh-CN', {
+                month: 'long',
+                day: 'numeric',
+                weekday: 'long',
+              }).format(new Date())}
+            </span>
+            <span className="streak">
+              <Flame /> 今天完成 {completedToday} 题
+            </span>
           </div>
-        </div>
-        <div className="header-status">
-          <span className="date-label">
-            {new Intl.DateTimeFormat('zh-CN', {
-              month: 'long',
-              day: 'numeric',
-              weekday: 'long',
-            }).format(new Date())}
-          </span>
-          <span className="streak">
-            <Flame /> 今天完成 {completedToday} 题
-          </span>
-        </div>
-      </header>
-      <div className="workspace">
-        <Tabs value={tab} onValueChange={setTab}>
-          <TabsList variant="line" className="main-nav">
-            <TabsTrigger value="today">
-              <BookOpen /> 今日学习
-            </TabsTrigger>
-            <TabsTrigger value="test">
-              <Target /> 拼写测试
-            </TabsTrigger>
-            <TabsTrigger value="parent" className="parent-nav">
-              <ShieldCheck /> 设置与家长控制
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="today">
+        </header>
+        <main className="workspace">
+          {tab === 'today' && (
             <section className="dashboard-grid">
               <div className="today-hero">
                 <div className="hero-copy">
@@ -1150,26 +1186,10 @@ export default function Home() {
                   {currentChapter?.childNote}
                 </p>
               </div>
-              <div className="panel parent-shortcut">
-                <ShieldCheck />
-                <div>
-                  <h2>家长要改词库？</h2>
-                  <p>增删单词、调整章节、每日数量和备份，都集中在家长控制。</p>
-                </div>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setTab('parent');
-                    setParentTab('library');
-                  }}
-                >
-                  打开家长控制
-                </Button>
-              </div>
             </section>
-          </TabsContent>
+          )}
 
-          <TabsContent value="test">
+          {tab === 'test' && (
             <section className="test-center">
               <div className="page-title-row">
                 <div>
@@ -1299,22 +1319,31 @@ export default function Home() {
                 </Button>
               </div>
             </section>
-          </TabsContent>
+          )}
 
-          <TabsContent value="parent">
+          {tab === 'settings' && !parentOpen && (
+            <section className="settings-overview">
+              <h1>设置</h1>
+              <button
+                className="settings-entry"
+                onClick={() => setParentOpen(true)}
+              >
+                <ShieldCheck />
+                <span>
+                  <strong>家长控制</strong>
+                  <small>词库与章节、学习计划、测试方式、数据备份</small>
+                </span>
+                <ChevronRight />
+              </button>
+            </section>
+          )}
+          {tab === 'settings' && parentOpen && (
             <section className="parent-view">
-              <div className="parent-hero">
-                <div className="parent-icon">
-                  <ShieldCheck />
-                </div>
-                <div>
-                  <p className="eyebrow">PARENT CONTROL</p>
-                  <h1>设置与家长控制</h1>
-                  <p>
-                    所有可调整内容都在这里：学习计划、章节备注、词库增删、测试默认方式和备份。
-                  </p>
-                </div>
-                <Badge>家长入口</Badge>
+              <div className="parent-heading">
+                <Button variant="ghost" onClick={() => setParentOpen(false)}>
+                  <ArrowLeft /> 返回设置
+                </Button>
+                <h1>家长控制</h1>
               </div>
               <Tabs value={parentTab} onValueChange={setParentTab}>
                 <TabsList className="parent-tabs">
@@ -1874,8 +1903,8 @@ export default function Home() {
                 </TabsContent>
               </Tabs>
             </section>
-          </TabsContent>
-        </Tabs>
+          )}
+        </main>
       </div>
 
       <Dialog
@@ -2023,6 +2052,6 @@ export default function Home() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </main>
+    </SidebarProvider>
   );
 }
