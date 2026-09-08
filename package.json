@@ -14,6 +14,7 @@
     "verify:wordbank": "node scripts/verify_workbench.mjs",
     "verify:learning": "node scripts/verify_learning.mjs",
     "verify:learning-api": "node scripts/verify_learning_api.mjs",
+    "verify:resources": "node scripts/verify_resources.mjs",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {

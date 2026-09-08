@@ -6,12 +6,24 @@ const source = readFileSync(
   new URL('../app/learning-model.ts', import.meta.url),
   'utf8',
 );
-const compiled = ts.transpileModule(source, {
-  compilerOptions: {
-    module: ts.ModuleKind.ES2022,
-    target: ts.ScriptTarget.ES2022,
+const resourceCode = ts.transpileModule(
+  readFileSync(new URL('../app/word-resources.ts', import.meta.url), 'utf8'),
+  {
+    compilerOptions: {
+      module: ts.ModuleKind.ES2022,
+      target: ts.ScriptTarget.ES2022,
+    },
   },
-}).outputText;
+).outputText;
+const resourceUrl = `data:text/javascript;base64,${Buffer.from(resourceCode).toString('base64')}`;
+const compiled = ts
+  .transpileModule(source, {
+    compilerOptions: {
+      module: ts.ModuleKind.ES2022,
+      target: ts.ScriptTarget.ES2022,
+    },
+  })
+  .outputText.replace("'./word-resources'", JSON.stringify(resourceUrl));
 const {
   emptyLearning,
   newRecognition,

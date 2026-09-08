@@ -58,8 +58,11 @@ import {
   type RecognitionWord,
 } from './learning-model';
 import type { LearningStore } from './use-learning';
+import { WordAudio, stopWordAudio } from './word-audio';
+import { ResourcePicker } from './resource-picker';
 
 function speak(value: string) {
+  stopWordAudio();
   if (!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
   const speech = new SpeechSynthesisUtterance(value);
@@ -127,11 +130,9 @@ export function RecognitionView({
   const session = data.session;
   const current =
     teaching ?? data.words.find((w) => w.id === session?.queue[0]);
-  const spokenWord = current?.word;
   useEffect(() => {
     setImageFailed(false);
-    if (playing && spokenWord && data.plan.autoSpeak) speak(spokenWord);
-  }, [spokenWord, session?.step, playing, data.plan.autoSpeak]);
+  }, [current?.word, session?.step]);
   const disabled = busy || !ready || stale;
   async function begin() {
     setFeedback('');
@@ -192,15 +193,36 @@ export function RecognitionView({
                 <div className="recognition-copy">
                   <div className="recognition-word">
                     <h1>{current.word}</h1>
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      onClick={() => speak(current.word)}
-                      aria-label="播放单词"
-                    >
-                      <Volume2 />
-                    </Button>
                   </div>
+                  <WordAudio
+                    word={current.word}
+                    ipa={current.ipa}
+                    preferredUrl={current.audioUrl}
+                    autoPlay={data.plan.autoSpeak}
+                  />
+                  {current.imageSource && (
+                    <small className="media-attribution">
+                      <a
+                        href={current.imageSource}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        配图出处
+                      </a>{' '}
+                      · {current.imageAuthor} ·{' '}
+                      {current.imageLicenseUrl ? (
+                        <a
+                          href={current.imageLicenseUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {current.imageLicense}
+                        </a>
+                      ) : (
+                        current.imageLicense
+                      )}
+                    </small>
+                  )}
                   {(!current.image || imageFailed) && (
                     <p className="muted">
                       {imageFailed
@@ -758,7 +780,16 @@ export function RecognitionLibrary({
       const body = (await response.json()) as { error?: string; image: string };
       if (!response.ok) throw new Error(body.error);
       setDraft((current) =>
-        current ? { ...current, image: body.image } : current,
+        current
+          ? {
+              ...current,
+              image: body.image,
+              imageSource: '',
+              imageAuthor: '',
+              imageLicense: '',
+              imageLicenseUrl: '',
+            }
+          : current,
       );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '图片上传失败。');
@@ -1041,12 +1072,30 @@ export function RecognitionLibrary({
                   <img src={draft.image} alt="待保存的学习配图" />
                   <Button
                     variant="ghost"
-                    onClick={() => setDraft({ ...draft, image: '' })}
+                    onClick={() =>
+                      setDraft({
+                        ...draft,
+                        image: '',
+                        imageSource: '',
+                        imageAuthor: '',
+                        imageLicense: '',
+                        imageLicenseUrl: '',
+                      })
+                    }
                   >
                     移除这张配图
                   </Button>
                 </div>
               )}
+              <ResourcePicker
+                key={`${draft.id}-${draft.word}`}
+                word={draft}
+                onApply={(change) =>
+                  setDraft((current) =>
+                    current ? { ...current, ...change } : current,
+                  )
+                }
+              />
               {message && <p className="full notice-banner">{message}</p>}
               {store.error && (
                 <p className="full notice-banner">{store.error}</p>

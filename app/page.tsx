@@ -28,11 +28,11 @@ import {
   Target,
   Trash2,
   Upload,
-  Volume2,
   XCircle,
 } from 'lucide-react';
 import rawBank from './word-bank-v08.json';
 import { useLearning } from './use-learning';
+import { WordAudio } from './word-audio';
 import {
   learningStats,
   validateLearning,
@@ -114,6 +114,7 @@ type Word = {
   phonics: string;
   meaning: string;
   example: string;
+  audioUrl?: string;
   status: WordStatus;
   active: boolean;
   interval: number;
@@ -217,15 +218,6 @@ function sortWords(words: Word[]) {
   return [...words].sort(
     (a, b) => a.chapterOrder - b.chapterOrder || a.wordOrder - b.wordOrder,
   );
-}
-
-function speak(text: string) {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-  window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = 'en-US';
-  utterance.rate = 0.76;
-  window.speechSynthesis.speak(utterance);
 }
 
 function loadStored<T>(key: string, fallback: T): T {
@@ -448,8 +440,7 @@ export default function Home() {
   useEffect(() => {
     if (!currentQuizWord || checked || quizFinished) return;
     setTimeout(() => answerRef.current?.focus(), 80);
-    if (settings.autoSpeak) speak(currentQuizWord.word);
-  }, [checked, currentQuizWord, quizFinished, settings.autoSpeak]);
+  }, [checked, currentQuizWord, quizFinished]);
 
   useEffect(() => {
     type WebTool = {
@@ -942,13 +933,14 @@ export default function Home() {
               {session.type === 'missing' ? '缺字母测试' : '全单词测试'}
             </span>
           </div>
-          <button
-            className="sound-button"
-            onClick={() => speak(currentQuizWord.word)}
-            aria-label="播放单词发音"
-          >
-            <Volume2 />
-          </button>
+          <WordAudio
+            key={currentQuizWord.id}
+            word={currentQuizWord.word}
+            ipa={currentQuizWord.ipa}
+            preferredUrl={currentQuizWord.audioUrl}
+            autoPlay={settings.autoSpeak && !checked}
+            hideDetails={!checked}
+          />
           <p className="meaning-prompt">{currentQuizWord.meaning}</p>
           {session.type === 'missing' ? (
             <div className="missing-word" aria-label="缺字母单词">
@@ -2003,6 +1995,20 @@ export default function Home() {
                   </SelectContent>
                 </Select>
               </label>
+              <div className="full">
+                <h3>拼写用词典录音</h3>
+                <p className="muted">
+                  自动按本词音标匹配，同等条件优先美音。多音词可在这里试听并选定。
+                </p>
+                <WordAudio
+                  word={draftWord.word}
+                  ipa={draftWord.ipa}
+                  preferredUrl={draftWord.audioUrl}
+                  onSelect={(audioUrl) =>
+                    setDraftWord({ ...draftWord, audioUrl })
+                  }
+                />
+              </div>
               <label className="full">
                 简短例句
                 <Input

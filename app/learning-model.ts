@@ -1,3 +1,5 @@
+import { approvedAudio, approvedImage, safeSource } from './word-resources';
+
 export type RecognitionWord = {
   id: string;
   word: string;
@@ -9,6 +11,11 @@ export type RecognitionWord = {
   example: string;
   source: string;
   image: string;
+  audioUrl?: string;
+  imageSource?: string;
+  imageAuthor?: string;
+  imageLicense?: string;
+  imageLicenseUrl?: string;
   active: boolean;
   stage: number;
   due: number;
@@ -392,9 +399,30 @@ export function validateLearning(value: unknown): LearningData {
     fail();
   const words = array(data.words).map((v) => {
     const w = obj(v);
-    const image = str(w.image, 200);
-    if (image && !/^\/api\/learning\/image\?id=[a-f0-9-]{36}$/.test(image))
+    const image = str(w.image, 1500);
+    if (
+      image &&
+      !/^\/api\/learning\/image\?id=[a-f0-9-]{36}$/.test(image) &&
+      !approvedImage(image)
+    )
       fail();
+    const media: Partial<RecognitionWord> = {};
+    if (w.audioUrl !== undefined) {
+      media.audioUrl = str(w.audioUrl, 1000);
+      if (media.audioUrl && !approvedAudio(media.audioUrl)) fail();
+    }
+    if (w.imageSource !== undefined) {
+      media.imageSource = str(w.imageSource, 1000);
+      if (media.imageSource && !safeSource(media.imageSource)) fail();
+    }
+    if (w.imageAuthor !== undefined)
+      media.imageAuthor = str(w.imageAuthor, 1200);
+    if (w.imageLicense !== undefined)
+      media.imageLicense = str(w.imageLicense, 150);
+    if (w.imageLicenseUrl !== undefined) {
+      media.imageLicenseUrl = str(w.imageLicenseUrl, 1000);
+      if (media.imageLicenseUrl && !safeSource(media.imageLicenseUrl)) fail();
+    }
     return {
       id: str(w.id, 100, true),
       word: str(w.word, 100, true),
@@ -404,8 +432,9 @@ export function validateLearning(value: unknown): LearningData {
       chapter: str(w.chapter, 120, true),
       learnedOn: date(w.learnedOn),
       example: str(w.example),
-      source: str(w.source, 500),
+      source: str(w.source, 2000),
       image,
+      ...media,
       active: bool(w.active),
       stage: num(w.stage, 0, 12),
       due: num(w.due),

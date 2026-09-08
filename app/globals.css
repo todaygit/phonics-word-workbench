@@ -1571,6 +1571,135 @@ button {
 }
 
 /* Reading, spelling and grammar stay visually distinct but share one calm workspace. */
+.word-audio {
+  margin: 18px 0;
+  text-align: left;
+}
+.word-audio-controls {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.word-audio-controls > button:first-child {
+  min-height: 44px;
+}
+.word-audio-controls [data-slot='select-trigger'] {
+  width: 145px;
+}
+.audio-message {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: #68748a;
+  line-height: 1.6;
+}
+.audio-secondary {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.audio-secondary button {
+  font-size: 14px;
+  color: #68748a;
+}
+.audio-choice {
+  display: block;
+  font-size: 14px;
+  margin-top: 14px;
+}
+.audio-choice > button {
+  margin-top: 8px;
+  width: 100%;
+}
+.media-attribution {
+  display: block;
+  font-size: 13px;
+  color: #68748a;
+  line-height: 1.7;
+  margin: 10px 0;
+  overflow-wrap: anywhere;
+}
+.media-attribution a,
+.resource-picker a {
+  color: #20778b;
+  text-decoration: underline;
+}
+.word-audio-test {
+  max-width: 520px;
+  margin: 12px auto 20px;
+}
+.word-audio-test .word-audio-controls,
+.word-audio-test .audio-secondary {
+  justify-content: center;
+}
+.word-audio-test .audio-message {
+  text-align: center;
+}
+.spelling-card > .word-audio {
+  padding-top: 38px;
+}
+.resource-picker {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px;
+  margin-top: 8px;
+  background: #f7f9fb;
+}
+.resource-picker h3 {
+  font-size: 18px;
+  margin-bottom: 10px;
+}
+.resource-picker h4 {
+  font-size: 16px;
+  margin: 20px 0 12px;
+}
+.resource-picker p {
+  font-size: 14px;
+  line-height: 1.7;
+}
+.example-candidate {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  margin: 10px 0;
+}
+.example-candidate > p {
+  font-size: 16px;
+}
+.resource-picker small {
+  display: block;
+  font-size: 13px;
+  color: #68748a;
+  line-height: 1.6;
+  margin: 8px 0;
+  overflow-wrap: anywhere;
+}
+.image-candidates {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.image-candidates article {
+  padding: 12px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.image-candidates img {
+  width: 100%;
+  height: 155px;
+  object-fit: contain;
+}
+@media (max-width: 640px) {
+  .image-candidates {
+    grid-template-columns: 1fr;
+  }
+  .resource-picker {
+    padding: 12px;
+  }
+}
 .today-learning,
 .learning-view {
   max-width: 1120px;
