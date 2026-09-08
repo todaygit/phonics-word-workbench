@@ -1,0 +1,42 @@
+{
+  "id": ".",
+  "name": "拼读小队 · 英语学习工作台",
+  "short_name": "拼读小队",
+  "description": "自然拼读单词背诵、拼写测试、语法测试与积分种树工作台",
+  "lang": "zh-CN",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#f6f8fb",
+  "theme_color": "#172033",
+  "categories": ["education", "kids"],
+  "icons": [
+    {
+      "src": "icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "今日学习",
+      "short_name": "今日学习",
+      "url": "."
+    }
+  ]
+}

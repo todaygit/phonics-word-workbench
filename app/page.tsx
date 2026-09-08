@@ -38,6 +38,7 @@ import rawBank from './word-bank-v08.json';
 import { useLearning } from './use-learning';
 import { WordAudio } from './word-audio';
 import { RewardsView, StatisticsView } from './activity-views';
+import { InstallAppPanel } from './pwa-install';
 import type { Award } from './activity-model';
 import { validParentPin } from './parent-lock';
 import {
@@ -1453,22 +1454,24 @@ export default function Home() {
 
           {tab === 'rewards' && <RewardsView />}
           {tab === 'statistics' && <StatisticsView />}
-          {tab === 'settings' && !parentOpen && (
-            <section className="settings-overview">
-              <h1>设置</h1>
-              <button
-                className="settings-entry"
-                onClick={() => setParentOpen(true)}
-              >
-                <ShieldCheck />
-                <span>
-                  <strong>家长控制</strong>
-                  <small>认词词库、拼写词库、语法题库、学习计划与备份</small>
-                </span>
-                <ChevronRight />
-              </button>
-            </section>
-          )}
+          <section
+            className="settings-overview"
+            hidden={tab !== 'settings' || parentOpen}
+          >
+            <h1>设置</h1>
+            <InstallAppPanel />
+            <button
+              className="settings-entry"
+              onClick={() => setParentOpen(true)}
+            >
+              <ShieldCheck />
+              <span>
+                <strong>家长控制</strong>
+                <small>认词词库、拼写词库、语法题库、学习计划与备份</small>
+              </span>
+              <ChevronRight />
+            </button>
+          </section>
           {tab === 'settings' && parentOpen && (
             <section className="parent-view">
               <div className="parent-heading">
