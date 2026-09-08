@@ -10,7 +10,6 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  CircleHelp,
   Download,
   FileJson,
   Flame,
@@ -33,6 +32,20 @@ import {
   XCircle,
 } from 'lucide-react';
 import rawBank from './word-bank-v08.json';
+import { useLearning } from './use-learning';
+import {
+  learningStats,
+  validateLearning,
+  type LearningData,
+} from './learning-model';
+import {
+  RecognitionView,
+  GrammarView,
+  RecognitionLibrary,
+  GrammarLibrary,
+  RecognitionPlan,
+  LearningStatus,
+} from './learning-views';
 import { Badge } from '@/components/ui/badge';
 import {
   AlertDialog,
@@ -286,6 +299,8 @@ function makeBlankWord(chapter: Chapter): Word {
 }
 
 export default function Home() {
+  const learning = useLearning();
+  const recognitionStats = learningStats(learning.data);
   const [chapters, setChapters] = useState<Chapter[]>(DEFAULT_CHAPTERS);
   const [words, setWords] = useState<Word[]>(DEFAULT_WORDS);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
@@ -382,15 +397,6 @@ export default function Home() {
       ),
     [activeWords],
   );
-  const masteredCount = words.filter(
-    (word) => word.status === 'mastered',
-  ).length;
-  const learningCount = words.filter(
-    (word) => word.status === 'learning',
-  ).length;
-  const progressPercent = settings.quizCount
-    ? Math.min(100, Math.round((completedToday / settings.quizCount) * 100))
-    : 0;
   const filteredWords = useMemo(() => {
     const lower = query.trim().toLowerCase();
     return sortWords(
@@ -805,6 +811,7 @@ export default function Home() {
         words,
         settings,
         sequenceCursor,
+        learning: learning.ready ? learning.data : undefined,
       },
       null,
       2,
@@ -828,9 +835,15 @@ export default function Home() {
         words?: Word[];
         settings?: Partial<Settings>;
         sequenceCursor?: number;
+        learning?: LearningData;
       };
       if (!Array.isArray(data.chapters) || !Array.isArray(data.words))
         throw new Error('invalid');
+      if (
+        data.learning &&
+        !(await learning.save(() => validateLearning(data.learning)))
+      )
+        return;
       setChapters(data.chapters);
       setWords(data.words);
       setSettings((current) => ({ ...current, ...data.settings }));
@@ -1025,7 +1038,7 @@ export default function Home() {
             </div>
             <div>
               <strong>拼读小队</strong>
-              <small>v0.8 拼写工作台</small>
+              <small>英语学习工作台</small>
             </div>
           </div>
         </SidebarHeader>
@@ -1034,7 +1047,9 @@ export default function Home() {
             <SidebarMenu className="app-navigation">
               {[
                 { value: 'today', label: '今日学习', icon: BookOpen },
+                { value: 'recognition', label: '单词背诵', icon: BookMarked },
                 { value: 'test', label: '拼写测试', icon: Target },
+                { value: 'grammar', label: '语法测试', icon: ListChecks },
                 { value: 'settings', label: '设置', icon: Settings2 },
               ].map(({ value, label, icon: Icon }) => (
                 <SidebarMenuItem key={value}>
@@ -1058,11 +1073,15 @@ export default function Home() {
       <div className="app-main">
         <header className="app-header">
           <span className="header-location">
-            {tab === 'today'
-              ? '今日学习'
-              : tab === 'test'
-                ? '拼写测试'
-                : '设置'}
+            {
+              {
+                today: '今日学习',
+                recognition: '单词背诵',
+                test: '拼写测试',
+                grammar: '语法测试',
+                settings: '设置',
+              }[tab]
+            }
           </span>
           <div className="header-status">
             <span className="date-label">
@@ -1073,120 +1092,84 @@ export default function Home() {
               }).format(new Date())}
             </span>
             <span className="streak">
-              <Flame /> 今天完成 {completedToday} 题
+              <Flame /> 今天认出 {recognitionStats.day.knownIds.length} 词 ·
+              拼写 {completedToday} 题
             </span>
           </div>
         </header>
         <main className="workspace">
           {tab === 'today' && (
-            <section className="dashboard-grid">
-              <div className="today-hero">
-                <div className="hero-copy">
-                  <p className="eyebrow">继续上次的学习顺序</p>
-                  <h1>{currentChapter?.title ?? 'v0.8 自然拼读'}</h1>
-                  <p className="chapter-note">{currentChapter?.childNote}</p>
-                  <div className="hero-actions">
-                    <Button className="primary-action" onClick={buildDailyQuiz}>
-                      <Play /> 开始今日顺序学习
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="dark-outline"
-                      onClick={() => {
-                        setTab('test');
-                        setQuizMode('chapter');
-                      }}
-                    >
-                      选择章节
-                    </Button>
-                  </div>
-                </div>
-                <div className="progress-orbit">
-                  <div
-                    className="orbit-ring"
-                    style={
-                      {
-                        '--progress': `${progressPercent}%`,
-                      } as React.CSSProperties
-                    }
-                  >
-                    <div>
-                      <strong>{completedToday}</strong>
-                      <span>/{settings.quizCount}</span>
-                      <small>今日拼写题</small>
-                    </div>
-                  </div>
-                  <span className="orbit-dot dot-one">a</span>
-                  <span className="orbit-dot dot-two">sh</span>
-                  <span className="orbit-dot dot-three">ee</span>
+            <section className="today-learning">
+              <div className="page-title-row">
+                <div>
+                  <p className="eyebrow">TODAY</p>
+                  <h1>今天，从认识开始</h1>
+                  <p>认识单词、练习拼写、测试语法，分开进行。</p>
                 </div>
               </div>
-              <aside className="panel next-word-panel">
-                <div className="panel-heading">
-                  <div>
-                    <p className="eyebrow">下一词</p>
-                    <h2>{currentLearningWord?.word ?? '—'}</h2>
-                  </div>
-                  <button
-                    onClick={() =>
-                      currentLearningWord && speak(currentLearningWord.word)
-                    }
-                  >
-                    <Volume2 />
-                  </button>
+              <LearningStatus store={learning} />
+              <div className="today-recognition panel">
+                <BookOpen />
+                <div>
+                  <h2>单词背诵</h2>
+                  <p>
+                    新词 {recognitionStats.fresh.length} 个 · 可复习{' '}
+                    {recognitionStats.reviews.length} 个
+                    {learning.data.session?.queue.length
+                      ? ` · 上次待认 ${learning.data.session.queue.length} 个`
+                      : ''}
+                  </p>
+                  <p className="muted">看单词和图片，口头回答，不要求默写。</p>
                 </div>
-                <p className="next-meaning">{currentLearningWord?.meaning}</p>
-                <div className="mini-detail">
-                  <span>{currentLearningWord?.ipa}</span>
-                  <span>{currentLearningWord?.phonics}</span>
+                <Button onClick={() => setTab('recognition')}>
+                  去背单词 <ChevronRight />
+                </Button>
+              </div>
+              <div className="today-secondary">
+                <div className="panel">
+                  <Target />
+                  <h2>拼写测试</h2>
+                  <p>
+                    {currentChapter?.title ?? '自然拼读'} · 今日已答{' '}
+                    {completedToday} 题
+                  </p>
+                  <Button variant="outline" onClick={() => setTab('test')}>
+                    去练拼写
+                  </Button>
                 </div>
-                <p>{currentLearningWord?.example}</p>
-              </aside>
-              <div className="panel stats-panel">
-                <div className="stat">
-                  <Library />
-                  <div>
-                    <strong>{words.length}</strong>
-                    <small>v0.8 总词条</small>
-                  </div>
-                </div>
-                <div className="stat">
-                  <BookMarked />
-                  <div>
-                    <strong>{chapters.length}</strong>
-                    <small>学习章节</small>
-                  </div>
-                </div>
-                <div className="stat">
+                <div className="panel">
                   <ListChecks />
-                  <div>
-                    <strong>{learningCount + masteredCount}</strong>
-                    <small>已经练过</small>
-                  </div>
+                  <h2>语法测试</h2>
+                  <p>
+                    {learning.data.grammar.filter((q) => q.active).length}{' '}
+                    道已启用题目 · 选择题与填空题
+                  </p>
+                  <Button variant="outline" onClick={() => setTab('grammar')}>
+                    去测语法
+                  </Button>
                 </div>
-                <div className="stat">
-                  <RotateCcw />
-                  <div>
-                    <strong>{dueWords.length}</strong>
-                    <small>今天待复习</small>
-                  </div>
-                </div>
-              </div>
-              <div className="panel current-rule">
-                <div className="panel-heading">
-                  <h2>本章标题与备注</h2>
-                  <CircleHelp />
-                </div>
-                <p>
-                  <strong>规则：</strong>
-                  {currentChapter?.rule}
-                </p>
-                <p>
-                  <strong>给孩子：</strong>
-                  {currentChapter?.childNote}
-                </p>
               </div>
             </section>
+          )}
+          {tab === 'recognition' && (
+            <RecognitionView
+              store={learning}
+              manage={() => {
+                setTab('settings');
+                setParentOpen(true);
+                setParentTab('recognition-library');
+              }}
+            />
+          )}
+          {tab === 'grammar' && (
+            <GrammarView
+              store={learning}
+              manage={() => {
+                setTab('settings');
+                setParentOpen(true);
+                setParentTab('grammar-library');
+              }}
+            />
           )}
 
           {tab === 'test' && (
@@ -1203,6 +1186,16 @@ export default function Home() {
               {quizMessage && (
                 <div className="notice-banner">{quizMessage}</div>
               )}
+              <div className="panel learning-note">
+                <h2>今日拼写计划</h2>
+                <p>
+                  按家长设置安排新词 {settings.newPerDay} 个、复习最多{' '}
+                  {settings.reviewPerDay} 个，只记录拼写结果。
+                </p>
+                <Button variant="outline" onClick={buildDailyQuiz}>
+                  开始今日拼写练习
+                </Button>
+              </div>
               <div className="test-section">
                 <div className="section-number">1</div>
                 <div className="section-copy">
@@ -1331,7 +1324,7 @@ export default function Home() {
                 <ShieldCheck />
                 <span>
                   <strong>家长控制</strong>
-                  <small>词库与章节、学习计划、测试方式、数据备份</small>
+                  <small>认词词库、拼写词库、语法题库、学习计划与备份</small>
                 </span>
                 <ChevronRight />
               </button>
@@ -1348,24 +1341,34 @@ export default function Home() {
               <Tabs value={parentTab} onValueChange={setParentTab}>
                 <TabsList className="parent-tabs">
                   <TabsTrigger value="plan">
-                    <Settings2 /> 学习与测试设置
+                    <Settings2 /> 学习计划
+                  </TabsTrigger>
+                  <TabsTrigger value="recognition-library">
+                    <BookOpen /> 认词词库
                   </TabsTrigger>
                   <TabsTrigger value="library">
-                    <Library /> 词库与章节管理
+                    <Library /> 拼写词库
+                  </TabsTrigger>
+                  <TabsTrigger value="grammar-library">
+                    <ListChecks /> 语法题库
                   </TabsTrigger>
                   <TabsTrigger value="backup">
                     <FileJson /> 数据备份
                   </TabsTrigger>
                 </TabsList>
                 <TabsContent value="plan">
+                  <RecognitionPlan store={learning} />
+                  <h2 className="spelling-plan-heading">
+                    拼写测试设置（不影响认词）
+                  </h2>
                   <div className="settings-grid">
                     <div className="settings-card">
                       <div className="setting-icon orange-bg">
                         <BookOpen />
                       </div>
                       <div className="setting-copy">
-                        <h2>每天新词</h2>
-                        <p>今日学习中引入的新词数量</p>
+                        <h2>每日拼写新词</h2>
+                        <p>每日拼写练习中引入的新词数量</p>
                       </div>
                       <strong className="setting-value">
                         {settings.newPerDay}
@@ -1393,8 +1396,8 @@ export default function Home() {
                         <RotateCcw />
                       </div>
                       <div className="setting-copy">
-                        <h2>每天复习</h2>
-                        <p>每天最多安排的复习词数量</p>
+                        <h2>每日拼写复习</h2>
+                        <p>每日拼写练习最多安排的复习词数量</p>
                       </div>
                       <strong className="setting-value">
                         {settings.reviewPerDay}
@@ -1526,6 +1529,16 @@ export default function Home() {
                   </div>
                 </TabsContent>
 
+                <TabsContent value="recognition-library">
+                  <RecognitionLibrary
+                    store={learning}
+                    sourceWords={sortWords(words)}
+                    sourceChapters={orderedChapters}
+                  />
+                </TabsContent>
+                <TabsContent value="grammar-library">
+                  <GrammarLibrary store={learning} />
+                </TabsContent>
                 <TabsContent value="library">
                   <div className="library-summary">
                     <div>
@@ -1833,6 +1846,13 @@ export default function Home() {
                 </TabsContent>
 
                 <TabsContent value="backup">
+                  <LearningStatus store={learning} />
+                  {quizMessage && (
+                    <output className="notice-banner">{quizMessage}</output>
+                  )}
+                  <p className="backup-storage-note">
+                    新增的认词词库、语法题库、配图和进度按登录账户保存。原有拼写词库及成绩仍保存在当前浏览器。备份包含两部分数据和图片引用；图片文件保留在本工作台账户中。
+                  </p>
                   <div className="backup-grid">
                     <section className="backup-card">
                       <div className="backup-icon blue-bg">
@@ -1842,7 +1862,10 @@ export default function Home() {
                       <p>
                         保存章节标题、全部词条、中文词义、学习进度和家长设置。换设备前建议先导出。
                       </p>
-                      <Button onClick={exportBackup}>
+                      <Button
+                        disabled={!learning.ready || learning.busy}
+                        onClick={exportBackup}
+                      >
                         <Download /> 下载 JSON 备份
                       </Button>
                     </section>
@@ -1872,8 +1895,8 @@ export default function Home() {
                       </div>
                       <h2>恢复 v0.8 原始词库</h2>
                       <p>
-                        会清除当前增删修改和学习进度，回到本次导入的 33
-                        章、1,785 条词。
+                        只重置拼写词库和拼写进度，回到原始的 33 章、1,785
+                        条词。不会影响认词和语法。
                       </p>
                       <AlertDialog>
                         <AlertDialogTrigger

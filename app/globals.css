@@ -1569,3 +1569,491 @@ button {
     animation: none !important;
   }
 }
+
+/* Reading, spelling and grammar stay visually distinct but share one calm workspace. */
+.today-learning,
+.learning-view {
+  max-width: 1120px;
+  margin: 0 auto;
+}
+.today-recognition {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 30px;
+  border-left: 4px solid #25869b;
+}
+.today-recognition > svg {
+  width: 36px;
+  height: 36px;
+  color: #25869b;
+  flex-shrink: 0;
+}
+.today-recognition > div {
+  flex: 1;
+}
+.today-recognition h2,
+.today-secondary h2 {
+  font-size: 22px;
+  margin: 0 0 10px;
+}
+.today-recognition p,
+.today-secondary p {
+  margin: 8px 0;
+  line-height: 1.7;
+}
+.today-secondary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px;
+  margin-top: 22px;
+}
+.today-secondary > .panel {
+  padding: 28px;
+}
+.today-secondary > .panel > svg {
+  color: #68748a;
+  margin-bottom: 18px;
+}
+.muted {
+  color: #68748a;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.learning-counts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin: 24px 0;
+}
+.learning-counts > div {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 22px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+.learning-counts strong {
+  color: #20778b;
+  font-size: 32px;
+}
+.learning-counts span {
+  color: #68748a;
+  font-size: 14px;
+}
+.learning-launch,
+.learning-note,
+.recognition-plan,
+.grammar-setup {
+  padding: 28px;
+  margin-bottom: 24px;
+}
+.learning-launch h2,
+.learning-note h2,
+.recognition-plan h2,
+.grammar-setup h2 {
+  margin: 0 0 12px;
+  font-size: 21px;
+}
+.learning-launch p,
+.learning-note p,
+.recognition-plan p {
+  line-height: 1.8;
+  margin: 12px 0;
+}
+.learning-empty {
+  padding: 42px 24px;
+  text-align: center;
+  background: #fff;
+  border: 1px dashed #c8d5e0;
+  border-radius: 16px;
+  margin: 22px 0;
+}
+.learning-empty h1 {
+  font-size: 32px;
+  margin: 16px 0;
+}
+.learning-empty h2 {
+  font-size: 21px;
+  margin: 0 0 14px;
+}
+.learning-empty p {
+  line-height: 1.8;
+  color: #68748a;
+  margin: 14px 0 22px;
+}
+.learning-empty > svg {
+  width: 40px;
+  height: 40px;
+  margin: auto;
+  color: #25869b;
+}
+.learning-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0 0 22px;
+}
+.learning-topbar span {
+  color: #68748a;
+  font-size: 14px;
+}
+.recognition-card,
+.grammar-card {
+  background: #fff;
+  padding: 30px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+}
+.recognition-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #68748a;
+  font-size: 14px;
+  flex-wrap: wrap;
+}
+.recognition-content {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.85fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 36px;
+  padding: 30px 0;
+}
+.recognition-content.without-image {
+  display: block;
+  max-width: 720px;
+  margin: 0 auto;
+}
+.recognition-image {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  max-height: 340px;
+  object-fit: contain;
+  border-radius: 16px;
+}
+.recognition-word {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.recognition-word h1 {
+  font-size: clamp(32px, 5vw, 64px);
+  letter-spacing: -0.03em;
+  margin: 10px 0;
+  overflow-wrap: anywhere;
+}
+.recognition-word button {
+  flex-shrink: 0;
+}
+.recognition-example {
+  padding: 16px 0;
+}
+.recognition-example > p {
+  font-size: 22px;
+  line-height: 1.65;
+  margin: 0 0 8px;
+}
+.recognition-example small {
+  display: block;
+  font-size: 14px;
+  color: #68748a;
+  margin-top: 10px;
+}
+.recognition-details {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+.recognition-details summary {
+  cursor: pointer;
+  font-size: 14px;
+  color: #466076;
+}
+.recognition-details p {
+  margin: 10px 0;
+  font-size: 18px;
+}
+.oral-instruction {
+  text-align: center;
+  color: #68748a;
+  margin: 6px 0 20px;
+}
+.recognition-actions {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+}
+.recognition-actions button {
+  min-height: 56px;
+  padding-inline: 26px;
+  font-size: 18px;
+}
+.recognition-actions button:last-child {
+  background: #207d90;
+  color: #fff;
+}
+.learning-feedback {
+  text-align: center;
+  min-height: 24px;
+  font-size: 14px;
+  color: #68748a;
+  margin: 20px 0 0;
+}
+.grammar-card {
+  max-width: 850px;
+  margin: 0 auto;
+}
+.grammar-card h1 {
+  font-size: clamp(24px, 3.5vw, 36px);
+  line-height: 1.6;
+  margin: 32px 0 16px;
+}
+.grammar-card > form {
+  margin: 26px 0;
+}
+.grammar-card input {
+  margin: 10px 0 24px;
+  font-size: 22px;
+  min-height: 50px;
+}
+.grammar-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin: 28px 0;
+}
+.grammar-options button {
+  min-height: 56px;
+  height: auto;
+  white-space: normal;
+  padding: 16px;
+  font-size: 20px;
+}
+.grammar-feedback {
+  border-top: 1px solid var(--border);
+  margin-top: 24px;
+  padding-top: 24px;
+}
+.grammar-feedback h2 {
+  font-size: 22px;
+}
+.grammar-feedback p {
+  line-height: 1.8;
+  margin: 12px 0 20px;
+}
+.grammar-review {
+  text-align: left;
+  padding: 20px;
+  margin-bottom: 14px;
+  background: #f6f8fb;
+  border-radius: 12px;
+}
+.grammar-review p {
+  margin: 8px 0;
+}
+.compact-field {
+  display: block;
+  max-width: 240px;
+  margin: 24px 0;
+}
+.compact-field > button {
+  margin-top: 10px;
+}
+.parent-tabs {
+  max-width: 100%;
+  height: auto;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 6px;
+}
+.parent-tabs button {
+  min-height: 42px;
+  font-size: 14px;
+}
+.recognition-plan .word-form {
+  margin: 22px 0;
+}
+.word-form small {
+  display: block;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.7;
+  color: #68748a;
+}
+.switch-field {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.spelling-plan-heading {
+  font-size: 22px;
+  margin: 36px 0 20px;
+}
+.copy-bank {
+  display: flex;
+  align-items: flex-end;
+  gap: 20px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+.copy-bank label {
+  flex: 1;
+  min-width: 0;
+}
+.copy-bank label > button {
+  width: 100%;
+  margin-top: 10px;
+}
+.learning-library {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #fff;
+  overflow: hidden;
+  margin-top: 20px;
+}
+.learning-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(160px, 0.7fr) auto;
+  gap: 20px;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid var(--border);
+}
+.learning-row:last-child {
+  border-bottom: none;
+}
+.learning-row strong,
+.learning-row span,
+.learning-row small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.learning-row strong {
+  font-size: 18px;
+}
+.learning-row span {
+  font-size: 16px;
+  margin-top: 6px;
+}
+.learning-row small {
+  font-size: 14px;
+  color: #68748a;
+  margin-top: 6px;
+}
+.learning-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.grammar-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.image-editor img {
+  width: 150px;
+  height: 150px;
+  object-fit: contain;
+}
+.backup-storage-note {
+  font-size: 14px;
+  line-height: 1.8;
+  color: #68748a;
+  margin: 0 0 20px;
+}
+.word-dialog {
+  max-height: 90svh;
+  overflow-y: auto;
+}
+@media (max-width: 900px) {
+  .today-recognition {
+    flex-wrap: wrap;
+  }
+  .learning-counts > div {
+    display: block;
+    padding: 16px;
+  }
+  .learning-counts span {
+    display: block;
+    margin-top: 6px;
+  }
+  .recognition-content {
+    gap: 22px;
+  }
+  .learning-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .learning-row-meta {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .learning-row-actions {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+}
+@media (max-width: 640px) {
+  .today-secondary,
+  .recognition-content,
+  .grammar-options {
+    grid-template-columns: 1fr;
+  }
+  .today-recognition,
+  .today-secondary > .panel,
+  .learning-launch,
+  .learning-note,
+  .grammar-setup,
+  .recognition-plan {
+    padding: 20px 16px;
+  }
+  .today-recognition > svg {
+    display: none;
+  }
+  .today-recognition > div {
+    min-width: 100%;
+  }
+  .learning-counts {
+    gap: 8px;
+  }
+  .learning-counts > div {
+    padding: 12px 8px;
+  }
+  .learning-counts strong {
+    font-size: 26px;
+  }
+  .recognition-card,
+  .grammar-card {
+    padding: 20px 16px;
+  }
+  .recognition-image {
+    max-height: 220px;
+  }
+  .recognition-actions {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .copy-bank {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .learning-row {
+    grid-template-columns: 1fr;
+    padding: 16px;
+    gap: 10px;
+  }
+  .learning-row-actions,
+  .learning-row-meta {
+    grid-column: auto;
+    grid-row: auto;
+  }
+  .parent-tabs button {
+    padding: 10px 8px;
+    font-size: 14px;
+  }
+  .header-status .streak {
+    display: none;
+  }
+}
