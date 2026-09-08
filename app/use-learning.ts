@@ -6,6 +6,7 @@ import {
   validateLearning,
   type LearningData,
 } from './learning-model';
+import type { Award } from './activity-model';
 
 export function useLearning() {
   const [data, setData] = useState<LearningData>(emptyLearning);
@@ -14,6 +15,7 @@ export function useLearning() {
   const [error, setError] = useState('');
   const [needsLogin, setNeedsLogin] = useState(false);
   const [stale, setStale] = useState(false);
+  const [lastAward, setLastAward] = useState<Award | null>(null);
   const latest = useRef({ data, revision: 0 });
   const locked = useRef(false);
   const reload = useCallback(async () => {
@@ -90,6 +92,59 @@ export function useLearning() {
     },
     [ready, stale],
   );
-  return { data, ready, busy, error, needsLogin, stale, reload, save };
+  const answer = useCallback(
+    async (input: {
+      kind: 'recognition' | 'grammar';
+      sessionId?: string;
+      step: number;
+      known?: boolean;
+      answer?: string;
+    }) => {
+      if (locked.current || !ready || stale) return null;
+      locked.current = true;
+      setBusy(true);
+      setError('');
+      setLastAward(null);
+      try {
+        const response = await fetch('/api/learning/answer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...input, revision: latest.current.revision }),
+        });
+        if (response.status === 409 || response.status >= 500) setStale(true);
+        const body = (await response.json()) as {
+          error?: string;
+          data: LearningData;
+          revision: number;
+          award: Award;
+        };
+        if (!response.ok) throw new Error(body.error);
+        latest.current = { data: body.data, revision: body.revision };
+        setData(body.data);
+        setLastAward(body.award);
+        return body.award;
+      } catch (err) {
+        if (err instanceof TypeError) setStale(true);
+        setError(err instanceof Error ? err.message : '保存失败，请重新载入。');
+        return null;
+      } finally {
+        locked.current = false;
+        setBusy(false);
+      }
+    },
+    [ready, stale],
+  );
+  return {
+    data,
+    ready,
+    busy,
+    error,
+    needsLogin,
+    stale,
+    reload,
+    save,
+    answer,
+    lastAward,
+  };
 }
 export type LearningStore = ReturnType<typeof useLearning>;

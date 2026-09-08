@@ -46,10 +46,8 @@ import {
   AlertDialogAction,
 } from '@/components/ui/alert-dialog';
 import {
-  answerRecognition,
   dateKey,
   exampleGrammar,
-  gradeGrammar,
   learningStats,
   newGrammar,
   newRecognition,
@@ -143,11 +141,19 @@ export function RecognitionView({
     if (!session) return;
     const step = session.step;
     const missed = current;
-    if (await save((current) => answerRecognition(current, known, step))) {
+    const award = await store.answer({
+      kind: 'recognition',
+      sessionId: session.id,
+      step,
+      known,
+    });
+    if (award) {
       if (!known && missed) setTeaching(missed);
       setFeedback(
         known
-          ? '已记下，稍后还会安排复习。'
+          ? award.points
+            ? '认出来了！+1 积分，小树长大一点。'
+            : '认出来了！今天这个词已得分，继续巩固。'
           : '没关系，读一读、看一看，等会儿再认一次。',
       );
     }
@@ -300,6 +306,7 @@ export function RecognitionView({
             <div className="learning-empty">
               <Check />
               <h1>这一轮认完了</h1>
+              <p className="reward-feedback">{feedback}</p>
               <p>认出的词已经安排好下次复习。不认识过的词会更早再见面。</p>
               <Button onClick={() => setPlaying(false)}>返回背诵中心</Button>
             </div>
@@ -420,19 +427,11 @@ export function GrammarView({
   async function check() {
     if (!question || !answer.trim() || !session || showFeedback) return;
     const expectedIndex = index;
-    const ok = await save((current) => {
-      const active = current.grammarSession;
-      if (!active || active.answers.length !== expectedIndex) return current;
-      return {
-        ...current,
-        grammarSession: {
-          ...active,
-          answers: [
-            ...active.answers,
-            { answer: answer.trim(), correct: gradeGrammar(question, answer) },
-          ],
-        },
-      };
+    const ok = await store.answer({
+      kind: 'grammar',
+      sessionId: session.id,
+      step: expectedIndex,
+      answer,
     });
     if (ok) setShowFeedback(true);
   }
@@ -501,6 +500,13 @@ export function GrammarView({
                     ? '答对了！'
                     : `正确答案：${question.answer.split('|').join(' / ')}`}
                 </h2>
+                {store.lastAward?.correct && (
+                  <p className="reward-feedback">
+                    {store.lastAward.points
+                      ? '+1 积分 · 小树长大一点'
+                      : '今天这道题已得分，继续巩固。'}
+                  </p>
+                )}
                 <p>
                   {question.explanation || '这道题暂未填写解析，可请家长讲解。'}
                 </p>
@@ -603,6 +609,7 @@ export function GrammarView({
                   await save((d) => ({
                     ...d,
                     grammarSession: {
+                      id: crypto.randomUUID(),
                       questions: selected.slice(0, Number(count)),
                       answers: [],
                     },

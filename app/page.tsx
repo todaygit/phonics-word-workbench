@@ -26,6 +26,8 @@ import {
   Shuffle,
   Sparkles,
   Target,
+  Sprout,
+  BarChart3,
   Trash2,
   Upload,
   XCircle,
@@ -33,6 +35,8 @@ import {
 import rawBank from './word-bank-v08.json';
 import { useLearning } from './use-learning';
 import { WordAudio } from './word-audio';
+import { RewardsView, StatisticsView } from './activity-views';
+import type { Award } from './activity-model';
 import {
   learningStats,
   validateLearning,
@@ -130,6 +134,7 @@ type Settings = {
   autoSpeak: boolean;
 };
 type QuizSession = {
+  id: string;
   queue: Word[];
   mode: QuizMode;
   type: QuizType;
@@ -230,10 +235,6 @@ function loadStored<T>(key: string, fallback: T): T {
   }
 }
 
-function normalizeAnswer(value: string) {
-  return value.toLowerCase().trim().replace(/\s+/g, ' ');
-}
-
 function shuffle<T>(items: T[]) {
   const result = [...items];
   for (let index = result.length - 1; index > 0; index -= 1) {
@@ -314,6 +315,15 @@ export default function Home() {
   const [quizFinished, setQuizFinished] = useState(false);
   const [results, setResults] = useState<QuizResult[]>([]);
   const [quizMessage, setQuizMessage] = useState('');
+  const [scoreBusy, setScoreBusy] = useState(false);
+  const [scoreAward, setScoreAward] = useState<Award | null>(null);
+  const scoreLocked = useRef(false);
+  const pendingScore = useRef<{
+    eventId: string;
+    word: string;
+    answer: string;
+    expected: string;
+  } | null>(null);
   const [query, setQuery] = useState('');
   const [chapterFilter, setChapterFilter] = useState('all');
   const [wordPage, setWordPage] = useState(1);
@@ -326,6 +336,14 @@ export default function Home() {
   );
   const importRef = useRef<HTMLInputElement>(null);
   const answerRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const warn = (event: BeforeUnloadEvent) => {
+      if (scoreLocked.current) event.preventDefault();
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, []);
 
   useEffect(() => {
     const storedVersion = window.localStorage.getItem('phonics.bankVersion');
@@ -615,7 +633,16 @@ export default function Home() {
       return;
     }
     setQuizMessage('');
-    setSession({ queue, mode, type, startCursor, cursorAdvance });
+    pendingScore.current = null;
+    setScoreAward(null);
+    setSession({
+      id: crypto.randomUUID(),
+      queue,
+      mode,
+      type,
+      startCursor,
+      cursorAdvance,
+    });
     setQuizIndex(0);
     setQuizInput('');
     setChecked(false);
@@ -649,12 +676,16 @@ export default function Home() {
       return;
     }
     setSession({
+      id: crypto.randomUUID(),
       queue,
       mode: 'sequence',
       type: settings.defaultQuizType,
       startCursor,
       cursorAdvance: fresh.length,
     });
+    pendingScore.current = null;
+    setScoreAward(null);
+    setQuizMessage('');
     setQuizIndex(0);
     setQuizInput('');
     setChecked(false);
@@ -662,16 +693,52 @@ export default function Home() {
     setResults([]);
   }
 
-  function checkAnswer() {
-    if (!currentQuizWord || !quizInput.trim() || checked) return;
-    const isCorrect =
-      normalizeAnswer(quizInput) === normalizeAnswer(expectedAnswer);
+  async function checkAnswer() {
+    if (
+      !session ||
+      !currentQuizWord ||
+      !quizInput.trim() ||
+      checked ||
+      scoreLocked.current
+    )
+      return;
+    scoreLocked.current = true;
+    setScoreBusy(true);
+    setQuizMessage('');
+    const submitted = pendingScore.current ?? {
+      eventId: `spell:${session.id}:${quizIndex}`,
+      word: currentQuizWord.word,
+      answer: quizInput,
+      expected: expectedAnswer,
+    };
+    pendingScore.current = submitted;
+    let award: Award;
+    try {
+      const response = await fetch('/api/activity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(submitted),
+      });
+      const body = (await response.json()) as Award & { error?: string };
+      if (!response.ok) throw new Error(body.error || '保存失败，请重试。');
+      award = body as Award;
+    } catch (error) {
+      setQuizMessage(
+        `${error instanceof Error ? error.message : '保存失败。'} 原答案已保留，请点击重试；不会重复计分。`,
+      );
+      return;
+    } finally {
+      scoreLocked.current = false;
+      setScoreBusy(false);
+    }
+    const isCorrect = award.correct;
+    setScoreAward(award);
     setResults((current) => [
       ...current,
       {
         wordId: currentQuizWord.id,
         word: currentQuizWord.word,
-        answer: quizInput,
+        answer: submitted.answer,
         correct: isCorrect,
       },
     ]);
@@ -697,6 +764,9 @@ export default function Home() {
 
   function nextQuestion() {
     if (!session) return;
+    pendingScore.current = null;
+    setScoreAward(null);
+    setQuizMessage('');
     if (quizIndex < session.queue.length - 1) {
       setQuizIndex((value) => value + 1);
       setQuizInput('');
@@ -711,6 +781,10 @@ export default function Home() {
   }
 
   function closeSession() {
+    if (scoreLocked.current) return;
+    pendingScore.current = null;
+    setScoreAward(null);
+    setQuizMessage('');
     setSession(null);
     setQuizFinished(false);
     setTab('test');
@@ -910,7 +984,7 @@ export default function Home() {
     return (
       <main className="session-shell">
         <div className="session-topbar">
-          <Button variant="ghost" onClick={closeSession}>
+          <Button variant="ghost" onClick={closeSession} disabled={scoreBusy}>
             <ArrowLeft /> 退出本轮
           </Button>
           <div className="session-progress">
@@ -942,6 +1016,9 @@ export default function Home() {
             hideDetails={!checked}
           />
           <p className="meaning-prompt">{currentQuizWord.meaning}</p>
+          {quizMessage && (
+            <output className="notice-banner">{quizMessage}</output>
+          )}
           {session.type === 'missing' ? (
             <div className="missing-word" aria-label="缺字母单词">
               {missingPrompt?.mask}
@@ -957,7 +1034,7 @@ export default function Home() {
               className="answer-form"
               onSubmit={(event) => {
                 event.preventDefault();
-                checkAnswer();
+                void checkAnswer();
               }}
             >
               <label htmlFor="spelling-answer">
@@ -971,6 +1048,7 @@ export default function Home() {
                 autoComplete="off"
                 spellCheck={false}
                 value={quizInput}
+                disabled={scoreBusy || Boolean(pendingScore.current)}
                 onChange={(event) => setQuizInput(event.target.value)}
                 placeholder={
                   session.type === 'missing' ? '填入空缺字母' : '在这里拼写'
@@ -979,9 +1057,14 @@ export default function Home() {
               <Button
                 type="submit"
                 className="primary-action"
-                disabled={!quizInput.trim()}
+                disabled={!quizInput.trim() || scoreBusy}
               >
-                <Check /> 检查答案
+                <Check />{' '}
+                {scoreBusy
+                  ? '正在保存…'
+                  : pendingScore.current
+                    ? '重试保存答案'
+                    : '检查答案'}
               </Button>
             </form>
           ) : (
@@ -1008,6 +1091,13 @@ export default function Home() {
                   {currentQuizWord.example || '未填写'}
                 </span>
               </div>
+              {scoreAward?.correct && (
+                <p className="reward-feedback">
+                  {scoreAward.points
+                    ? '+1 积分 · 小树长大一点'
+                    : '今天这个词已得分，继续巩固。'}
+                </p>
+              )}
               <Button className="primary-action" onClick={nextQuestion}>
                 {quizIndex < session.queue.length - 1 ? '下一题' : '查看成绩'}{' '}
                 <ChevronRight />
@@ -1042,6 +1132,8 @@ export default function Home() {
                 { value: 'recognition', label: '单词背诵', icon: BookMarked },
                 { value: 'test', label: '拼写测试', icon: Target },
                 { value: 'grammar', label: '语法测试', icon: ListChecks },
+                { value: 'rewards', label: '积分种树', icon: Sprout },
+                { value: 'statistics', label: '学习统计', icon: BarChart3 },
                 { value: 'settings', label: '设置', icon: Settings2 },
               ].map(({ value, label, icon: Icon }) => (
                 <SidebarMenuItem key={value}>
@@ -1071,6 +1163,8 @@ export default function Home() {
                 recognition: '单词背诵',
                 test: '拼写测试',
                 grammar: '语法测试',
+                rewards: '积分种树',
+                statistics: '学习统计',
                 settings: '设置',
               }[tab]
             }
@@ -1306,6 +1400,8 @@ export default function Home() {
             </section>
           )}
 
+          {tab === 'rewards' && <RewardsView />}
+          {tab === 'statistics' && <StatisticsView />}
           {tab === 'settings' && !parentOpen && (
             <section className="settings-overview">
               <h1>设置</h1>
@@ -1843,14 +1939,14 @@ export default function Home() {
                     <output className="notice-banner">{quizMessage}</output>
                   )}
                   <p className="backup-storage-note">
-                    新增的认词词库、语法题库、配图和进度按登录账户保存。原有拼写词库及成绩仍保存在当前浏览器。备份包含两部分数据和图片引用；图片文件保留在本工作台账户中。
+                    认词词库、语法题库、配图和进度按登录账户保存。原有拼写词库及复习进度仍保存在当前浏览器。备份包含两部分数据和图片引用；图片文件保留在本工作台账户中。积分和统计记录在云端独立保存，不包含在这个词库备份中，恢复词库不会回滚或叠加积分。
                   </p>
                   <div className="backup-grid">
                     <section className="backup-card">
                       <div className="backup-icon blue-bg">
                         <Download />
                       </div>
-                      <h2>导出完整备份</h2>
+                      <h2>导出词库与学习进度</h2>
                       <p>
                         保存章节标题、全部词条、中文词义、学习进度和家长设置。换设备前建议先导出。
                       </p>

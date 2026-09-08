@@ -39,6 +39,7 @@ export type RecognitionSession = {
   step: number;
 };
 export type GrammarSession = {
+  id?: string;
   questions: GrammarQuestion[];
   answers: { answer: string; correct: boolean }[];
 };
@@ -479,7 +480,11 @@ export function validateLearning(value: unknown): LearningData {
       return { answer, correct: gradeGrammar(questions[i], answer) };
     });
     if (!questions.length) fail();
-    grammarSession = { questions, answers };
+    grammarSession = {
+      questions,
+      answers,
+      ...(g.id !== undefined ? { id: str(g.id, 100, true) } : {}),
+    };
   }
   return {
     version: 1,

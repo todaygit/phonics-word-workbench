@@ -1088,6 +1088,268 @@ button {
 .word-dialog {
   max-width: 650px !important;
 }
+
+/* A quiet, functional growth indicator extends the existing icon language. */
+.report-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+.report-heading h1 {
+  font-size: 32px;
+  margin: 0;
+  font-weight: 750;
+}
+.reward-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 24px;
+}
+.growth-panel {
+  background: #edf8f4;
+  border: 1px solid #b3d9cd;
+  border-radius: 24px;
+  padding: 30px;
+  text-align: center;
+  color: #174f43;
+}
+.growth-stage {
+  display: inline-block;
+  border: 1px solid #98cbbb;
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  background: white;
+}
+.growth-indicator {
+  height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #168369;
+}
+.growth-indicator svg {
+  width: 128px;
+  height: 128px;
+}
+.growth-种子 svg {
+  width: 46px;
+  height: 46px;
+}
+.growth-嫩芽 svg {
+  width: 90px;
+  height: 90px;
+}
+.growth-小树 svg {
+  width: 156px;
+  height: 156px;
+}
+.growth-panel h2 {
+  font-size: 22px;
+  margin-bottom: 8px;
+}
+.growth-panel p {
+  font-size: 16px;
+  margin-bottom: 24px;
+}
+.growth-panel [data-slot='progress-indicator'] {
+  background: #19886f;
+}
+.growth-progress-label {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  font-size: 14px;
+}
+.growth-milestones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 26px;
+  font-size: 14px;
+  color: #3c675e;
+}
+.reward-details {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.reward-totals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.reward-totals > div {
+  background: white;
+  border: 1px solid #e1e6ed;
+  border-radius: 18px;
+  padding: 22px 12px;
+  text-align: center;
+}
+.reward-totals svg {
+  margin: auto auto 14px;
+  color: #25836b;
+  width: 24px;
+  height: 24px;
+}
+.reward-totals strong {
+  display: block;
+  font-size: 34px;
+  line-height: 1.2;
+  margin-bottom: 6px;
+}
+.reward-totals span {
+  font-size: 14px;
+  color: #58677d;
+}
+.reward-rules {
+  padding: 26px;
+  flex: 1;
+}
+.reward-rules h2,
+.forest-panel h2,
+.statistics-notes h2 {
+  font-size: 19px;
+  margin-bottom: 12px;
+  font-weight: 700;
+}
+.reward-rules p,
+.statistics-notes p {
+  font-size: 16px;
+  line-height: 1.8;
+  color: #46556c;
+  margin-bottom: 12px;
+}
+.reward-rules small {
+  color: #657286;
+  font-size: 13px;
+}
+.forest-panel {
+  padding: 26px;
+  margin-top: 24px;
+}
+.forest-panel p {
+  color: #58677d;
+  font-size: 16px;
+}
+.forest-icons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 18px;
+  color: #198568;
+  margin-top: 18px;
+}
+.forest-icons svg {
+  width: 46px;
+  height: 46px;
+}
+.reward-feedback {
+  color: #087451;
+  font-weight: 650;
+  font-size: 16px;
+  padding: 10px 0;
+}
+.statistics-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+.statistics-controls label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+}
+.statistics-controls input {
+  width: 175px;
+  background: white;
+}
+.statistics-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+.statistics-summary article {
+  border: 1px solid #dfe5ee;
+  background: white;
+  border-radius: 18px;
+  padding: 22px;
+}
+.statistics-summary span,
+.statistics-summary small {
+  display: block;
+  color: #58677d;
+  font-size: 14px;
+}
+.statistics-summary strong {
+  display: block;
+  font-size: 32px;
+  margin: 10px 0;
+}
+.statistics-table {
+  padding: 8px 20px 16px;
+  overflow: hidden;
+}
+.statistics-table table {
+  min-width: 850px;
+  font-size: 14px;
+}
+.statistics-table th {
+  color: #45556c;
+  font-weight: 650;
+  padding: 15px 10px;
+}
+.statistics-table td {
+  padding: 12px 10px;
+  font-variant-numeric: tabular-nums;
+}
+.statistics-table caption {
+  font-size: 14px;
+  text-align: left;
+  color: #58677d;
+  padding: 16px 8px 4px;
+}
+.statistics-total {
+  font-weight: 700;
+  background: #edf4fa;
+}
+.statistics-notes {
+  margin-top: 24px;
+}
+@media (max-width: 1000px) {
+  .reward-layout {
+    grid-template-columns: 1fr;
+  }
+  .statistics-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .growth-panel,
+  .reward-rules,
+  .forest-panel {
+    padding: 22px 16px;
+  }
+  .reward-totals strong {
+    font-size: 28px;
+  }
+  .statistics-summary article {
+    padding: 16px;
+  }
+  .statistics-table {
+    padding: 4px 8px 12px;
+  }
+  .report-heading h1 {
+    font-size: 28px;
+  }
+}
 .word-form {
   display: grid;
   grid-template-columns: 1fr 1fr;
