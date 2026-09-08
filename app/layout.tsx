@@ -7,6 +7,8 @@ export const metadata: Metadata = {
     '按自然拼读学习顺序进行缺字母与全词拼写测试，并提供独立家长控制词库。',
 };
 
+export const dynamic = 'force-static';
+
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {

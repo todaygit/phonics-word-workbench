@@ -1,0 +1,48 @@
+name: Publish GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build browser-only workbench
+        run: pnpm build:github
+        env:
+          GITHUB_PAGES: 'true'
+          NEXT_PUBLIC_GITHUB_PAGES: 'true'
+      - name: Add GitHub Pages fallbacks
+        run: |
+          touch out/.nojekyll
+          cp out/index.html out/404.html
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: out
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

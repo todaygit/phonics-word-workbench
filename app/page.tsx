@@ -1,4 +1,5 @@
 'use client';
+import './github-runtime';
 /* oxlint-disable react/react-compiler, jsx-a11y/label-has-associated-control */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
