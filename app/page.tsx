@@ -37,6 +37,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import rawBank from './word-bank-v19.json';
+import { localAward } from './github-activity';
 import { useLearning } from './use-learning';
 import { WordAudio } from './word-audio';
 import { RewardsView, StatisticsView } from './activity-views';
@@ -1068,10 +1069,12 @@ function Workbench() {
       if (!response.ok) throw new Error(body.error || '保存失败，请重试。');
       award = body as Award;
     } catch (error) {
-      setQuizMessage(
-        `${error instanceof Error ? error.message : '保存失败。'} 原答案已保留，请点击重试；不会重复计分。`,
-      );
-      return;
+      if (typeof window !== 'undefined' && (error instanceof TypeError || /fetch|网络|404|未找到/i.test(String(error)))) {
+        award = localAward(submitted.eventId, submitted.word, submitted.answer, submitted.expected);
+      } else {
+        setQuizMessage(`${error instanceof Error ? error.message : '保存失败。'} 原答案已保留，请点击重试；不会重复计分。`);
+        return;
+      }
     } finally {
       scoreLocked.current = false;
       setScoreBusy(false);

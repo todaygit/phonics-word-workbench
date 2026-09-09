@@ -24,6 +24,7 @@ import {
   TREE_CATALOG,
   TOY_CATALOG,
 } from './activity-model';
+import { localCheckIn, localForest, localReport } from './github-activity';
 
 function useReport(mode: ActivityMode, period: string) {
   const [report, setReport] = useState<ActivityReport | null>(null);
@@ -41,13 +42,11 @@ function useReport(mode: ActivityMode, period: string) {
         const data = (await response.json()) as ActivityReport & {
           error?: string;
         };
-        if (!response.ok)
-          throw new Error(data.error || '暂时无法读取学习记录。');
+        if (!response.ok) throw new Error(data.error || '暂时无法读取学习记录。');
         if (!controller.signal.aborted) setReport(data);
       })
-      .catch((reason) => {
-        if (!controller.signal.aborted)
-          setError(reason instanceof Error ? reason.message : '读取失败');
+      .catch(() => {
+        if (!controller.signal.aborted) setReport(localReport());
       });
     return () => controller.abort();
   }, [mode, period, retry]);
@@ -100,15 +99,13 @@ function useForest() {
         headers: { 'Content-Type': 'application/json' },
         body: '{}',
       });
-      if (!checkIn.ok && checkIn.status !== 401)
-        throw new Error('今日登录积分暂时未领取。');
+      if (!checkIn.ok && checkIn.status !== 401) localCheckIn();
       const response = await fetch('/api/forest', { cache: 'no-store' });
       const data = (await response.json()) as Forest & { error?: string };
-      if (!response.ok) throw new Error(data.error || '暂时无法读取成长森林。');
+      if (!response.ok) { localCheckIn(); if (active) setForest(localForest()); return; }
       if (active) setForest(data);
-    })().catch((reason) => {
-      if (active)
-        setError(reason instanceof Error ? reason.message : '读取失败');
+    })().catch(() => {
+      localCheckIn(); if (active) setForest(localForest());
     });
     return () => {
       active = false;
