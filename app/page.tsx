@@ -42,7 +42,11 @@ import { useLearning } from './use-learning';
 import { WordAudio } from './word-audio';
 import { RewardsView, StatisticsView } from './activity-views';
 import { InstallAppPanel } from './pwa-install';
-import { CloudSyncPanel, CloudSyncProvider } from './cloud-sync';
+import {
+  CloudSyncPanel,
+  CloudSyncProvider,
+  saveLocalSafetyBackup,
+} from './cloud-sync';
 import type { Award } from './activity-model';
 import { validParentPin } from './parent-lock';
 import {
@@ -475,6 +479,9 @@ function Workbench() {
   }, []);
 
   useEffect(() => {
+    // Preserve the current device state before any bank/schema migration runs.
+    // This is intentionally kept outside the cloud snapshot namespace.
+    saveLocalSafetyBackup('应用更新前');
     const storedVersion = window.localStorage.getItem('phonics.bankVersion');
     const storedWords = loadStored<Word[]>('phonics.words', []);
     if (storedVersion === BANK_VERSION && storedWords.length) {

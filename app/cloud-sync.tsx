@@ -26,6 +26,7 @@ const SUPABASE_KEY = 'sb_publishable_0IcnprXg1kNIqJAcnomJKg_1_9xP0va';
 const SESSION_KEY = 'phonics.cloud.session';
 const LAST_SYNC_KEY = 'phonics.cloud.lastSyncAt';
 const BEFORE_RESTORE_KEY = 'phonics.cloud.beforeCloudRestore';
+const LOCAL_BACKUPS_KEY = 'phonics.cloud.localBackups';
 const APP_URL = 'https://todaygit.github.io/phonics-word-workbench/';
 
 type CloudStatus =
@@ -49,6 +50,8 @@ type Snapshot = {
   savedAt: string;
   items: Record<string, string>;
 };
+
+type LocalSafetyBackup = Snapshot & { reason: string };
 
 type CloudRow = {
   revision: number;
@@ -125,8 +128,31 @@ function snapshotFingerprint(snapshot: Snapshot) {
   return JSON.stringify(snapshot.items);
 }
 
+/** Keep a small rolling, device-local safety net. Cloud restores and app
+ * migrations must never be the only copy of a family's current progress. */
+export function saveLocalSafetyBackup(reason = '自动备份') {
+  if (typeof window === 'undefined') return;
+  const snapshot = collectSnapshot();
+  if (!Object.keys(snapshot.items).length) return;
+  let previous: LocalSafetyBackup[] = [];
+  try {
+    const parsed = JSON.parse(
+      window.localStorage.getItem(LOCAL_BACKUPS_KEY) ?? '[]',
+    );
+    if (Array.isArray(parsed)) previous = parsed as LocalSafetyBackup[];
+  } catch {
+    previous = [];
+  }
+  const next: LocalSafetyBackup[] = [
+    ...previous,
+    { ...snapshot, reason, savedAt: new Date().toISOString() },
+  ].slice(-5);
+  window.localStorage.setItem(LOCAL_BACKUPS_KEY, JSON.stringify(next));
+}
+
 function restoreSnapshot(snapshot: Snapshot) {
   const current = collectSnapshot();
+  saveLocalSafetyBackup('云端记录覆盖前');
   window.localStorage.setItem(BEFORE_RESTORE_KEY, JSON.stringify(current));
   for (const key of Object.keys(window.localStorage)) {
     if (
