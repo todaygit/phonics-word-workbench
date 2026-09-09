@@ -29,7 +29,7 @@ export const TREE_CATALOG: TreeSpecies[] = [
   {
     id: 'sprout',
     name: '晨露嫩芽',
-    cost: 5,
+    cost: 50,
     symbol: '🌱',
     color: 'mint',
     note: '从一颗小芽开始',
@@ -37,7 +37,7 @@ export const TREE_CATALOG: TreeSpecies[] = [
   {
     id: 'apple',
     name: '红苹果树',
-    cost: 15,
+    cost: 100,
     symbol: '🍎',
     color: 'apple',
     note: '结满红红的小苹果',
@@ -45,7 +45,7 @@ export const TREE_CATALOG: TreeSpecies[] = [
   {
     id: 'pine',
     name: '松果小松',
-    cost: 30,
+    cost: 250,
     symbol: '🌲',
     color: 'pine',
     note: '四季常青的松树',
@@ -53,7 +53,7 @@ export const TREE_CATALOG: TreeSpecies[] = [
   {
     id: 'cherry',
     name: '樱花树',
-    cost: 50,
+    cost: 500,
     symbol: '🌸',
     color: 'cherry',
     note: '开出粉色花朵',
@@ -61,7 +61,7 @@ export const TREE_CATALOG: TreeSpecies[] = [
   {
     id: 'palm',
     name: '海风椰树',
-    cost: 80,
+    cost: 900,
     symbol: '🌴',
     color: 'palm',
     note: '带来暖暖海风',
@@ -69,7 +69,7 @@ export const TREE_CATALOG: TreeSpecies[] = [
   {
     id: 'maple',
     name: '金秋枫树',
-    cost: 120,
+    cost: 1500,
     symbol: '🍁',
     color: 'maple',
     note: '有金红色的叶子',
@@ -77,7 +77,7 @@ export const TREE_CATALOG: TreeSpecies[] = [
   {
     id: 'rainbow',
     name: '彩虹树',
-    cost: 180,
+    cost: 2200,
     symbol: '🌈',
     color: 'rainbow',
     note: '雨后出现七彩光芒',
@@ -85,7 +85,7 @@ export const TREE_CATALOG: TreeSpecies[] = [
   {
     id: 'star',
     name: '星光树',
-    cost: 250,
+    cost: 3000,
     symbol: '✨',
     color: 'star',
     note: '夜里闪着小星星',
@@ -93,7 +93,7 @@ export const TREE_CATALOG: TreeSpecies[] = [
   {
     id: 'moon',
     name: '月亮古树',
-    cost: 350,
+    cost: 4000,
     symbol: '🌙',
     color: 'moon',
     note: '守护安静的月夜',
@@ -101,10 +101,91 @@ export const TREE_CATALOG: TreeSpecies[] = [
   {
     id: 'wonder',
     name: '奇迹生命树',
-    cost: 500,
+    cost: 5000,
     symbol: '🌳',
     color: 'wonder',
     note: '森林里最珍贵的大树',
+  },
+];
+
+export type ToyPrize = {
+  id: string;
+  name: string;
+  symbol: string;
+  unlockPoints: number;
+  hint: string;
+};
+
+export const TOY_CATALOG: ToyPrize[] = [
+  {
+    id: 'toy-1',
+    name: '彩虹弹簧',
+    symbol: '🌈',
+    unlockPoints: 100,
+    hint: '会在桌面上跳舞的彩色小玩具',
+  },
+  {
+    id: 'toy-2',
+    name: '星星贴纸',
+    symbol: '⭐',
+    unlockPoints: 200,
+    hint: '可以贴在学习打卡本上的闪亮奖励',
+  },
+  {
+    id: 'toy-3',
+    name: '小火箭',
+    symbol: '🚀',
+    unlockPoints: 300,
+    hint: '拼对单词后会“嗖”地飞起来',
+  },
+  {
+    id: 'toy-4',
+    name: '云朵气球',
+    symbol: '🎈',
+    unlockPoints: 400,
+    hint: '轻轻飘起来的软绵绵礼物',
+  },
+  {
+    id: 'toy-5',
+    name: '魔法望远镜',
+    symbol: '🔭',
+    unlockPoints: 500,
+    hint: '看看森林里有没有隐藏的小动物',
+  },
+  {
+    id: 'toy-6',
+    name: '月光灯',
+    symbol: '🌙',
+    unlockPoints: 600,
+    hint: '晚上也能陪你读单词的小灯',
+  },
+  {
+    id: 'toy-7',
+    name: '小恐龙',
+    symbol: '🦖',
+    unlockPoints: 700,
+    hint: '喜欢听你把每个音节读清楚',
+  },
+  {
+    id: 'toy-8',
+    name: '音乐盒',
+    symbol: '🎵',
+    unlockPoints: 800,
+    hint: '答对后会送你一段轻快的旋律',
+  },
+  {
+    id: 'toy-9',
+    name: '探险车',
+    symbol: '🛻',
+    unlockPoints: 900,
+    hint: '带着你去发现下一章的新词',
+  },
+  {
+    id: 'toy-10',
+    name: '闪耀奖杯',
+    symbol: '🏆',
+    unlockPoints: 1000,
+    hint: '坚持学习到最后才能打开的大奖',
   },
 ];
 export function treeSpecies(id: string) {

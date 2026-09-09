@@ -22,6 +22,7 @@ import {
   type ActivityMode,
   type ActivityReport,
   TREE_CATALOG,
+  TOY_CATALOG,
 } from './activity-model';
 
 function useReport(mode: ActivityMode, period: string) {
@@ -131,9 +132,12 @@ export function RewardsView() {
     );
   const target =
     TREE_CATALOG.find((tree) => tree.id === selected) ?? TREE_CATALOG[0];
-  const progress = Math.min(100, (forest.available / target.cost) * 100);
+  const targetUnlocked = forest.earned >= target.cost;
+  const progress = targetUnlocked
+    ? Math.min(100, (forest.available / target.cost) * 100)
+    : 0;
   async function plant() {
-    if (planting || progress < 100) return;
+    if (planting || !targetUnlocked || progress < 100) return;
     setPlanting(true);
     setMessage('');
     const receipt = requestId || crypto.randomUUID();
@@ -216,8 +220,16 @@ export function RewardsView() {
             <span className="tree-symbol" aria-hidden="true">
               {tree.symbol}
             </span>
-            <strong>{tree.name}</strong>
-            <small>{tree.note}</small>
+            <strong>
+              {forest.earned >= tree.cost
+                ? tree.name
+                : `神秘盲盒 #${TREE_CATALOG.indexOf(tree) + 1}`}
+            </strong>
+            <small>
+              {forest.earned >= tree.cost
+                ? tree.note
+                : `累计 ${tree.cost} 分解锁 · 猜猜里面是什么`}
+            </small>
             <b>{tree.cost} 积分</b>
             {selected === tree.id && (
               <Check className="tree-selected" aria-label="已选择" />
@@ -231,25 +243,37 @@ export function RewardsView() {
           <div className="target-tree-symbol" aria-hidden="true">
             {target.symbol}
           </div>
-          <h2>{target.name}</h2>
-          <p>{target.note}</p>
+          <h2>{targetUnlocked ? target.name : '神秘盲盒'}</h2>
+          <p>
+            {targetUnlocked
+              ? target.note
+              : `猜想：${target.note} · 累计获得 ${target.cost} 分后揭晓`}
+          </p>
           <Progress value={progress} aria-label={`${target.name}积分进度`} />
           <div className="growth-progress-label">
             <span>
               {forest.available} / {target.cost} 分
             </span>
             <span>
-              {forest.available >= target.cost
-                ? '积分够啦，可以种下'
-                : `还差 ${target.cost - forest.available} 分`}
+              {!targetUnlocked
+                ? `还需累计获得 ${target.cost - forest.earned} 分解锁`
+                : forest.available >= target.cost
+                  ? '积分够啦，可以种下'
+                  : `还差 ${target.cost - forest.available} 分`}
             </span>
           </div>
           <Button
             className="plant-button"
-            disabled={planting || forest.available < target.cost}
+            disabled={
+              planting || !targetUnlocked || forest.available < target.cost
+            }
             onClick={() => void plant()}
           >
-            {planting ? '正在种下…' : `种下${target.name}`}
+            {planting
+              ? '正在种下…'
+              : targetUnlocked
+                ? `种下${target.name}`
+                : '达到积分后解锁'}
           </Button>
           {message && <output className="plant-message">{message}</output>}
         </article>
@@ -288,6 +312,40 @@ export function RewardsView() {
           </article>
         </div>
       </div>
+      <article className="panel toy-panel">
+        <div className="tree-shop-heading">
+          <div>
+            <h2>积分盲盒玩具</h2>
+            <p>累计每满 100 分解锁一个小玩具，未解锁时先猜猜它会是什么。</p>
+          </div>
+          <span>
+            当前已解锁{' '}
+            {
+              TOY_CATALOG.filter((toy) => forest.earned >= toy.unlockPoints)
+                .length
+            }{' '}
+            / {TOY_CATALOG.length}
+          </span>
+        </div>
+        <div className="toy-catalog">
+          {TOY_CATALOG.map((toy, index) => {
+            const unlocked = forest.earned >= toy.unlockPoints;
+            return (
+              <div
+                className={`toy-card ${unlocked ? 'unlocked' : 'locked'}`}
+                key={toy.id}
+              >
+                <span className="toy-symbol" aria-hidden="true">
+                  {unlocked ? toy.symbol : '🎁'}
+                </span>
+                <strong>{unlocked ? toy.name : `盲盒 #${index + 1}`}</strong>
+                <small>{unlocked ? toy.hint : `猜想：${toy.hint}`}</small>
+                <b>{unlocked ? '已解锁' : `${toy.unlockPoints} 分解锁`}</b>
+              </div>
+            );
+          })}
+        </div>
+      </article>
       <article className="panel forest-panel">
         <div>
           <h2>我的小树林</h2>

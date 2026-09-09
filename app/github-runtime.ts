@@ -85,11 +85,17 @@ function bodyText(input: RequestInfo | URL, init?: RequestInit) {
 function activities() {
   return read<LocalActivity[]>(activityKey, []);
 }
-function addActivity(event: Omit<LocalActivity, 'day' | 'points' | 'createdAt'>) {
+function addActivity(
+  event: Omit<LocalActivity, 'day' | 'points' | 'createdAt'>,
+) {
   const rows = activities();
   const existing = rows.find((row) => row.eventId === event.eventId);
   if (existing)
-    return { points: existing.points, correct: existing.correct, day: existing.day };
+    return {
+      points: existing.points,
+      correct: existing.correct,
+      day: existing.day,
+    };
   const day = chinaDay();
   const points =
     event.correct &&
@@ -125,9 +131,7 @@ function forestBalance() {
     todayPoints: rows
       .filter((row) => row.day === day)
       .reduce((sum, row) => sum + row.points, 0),
-    checkedInToday: rows.some(
-      (row) => row.day === day && row.kind === 'login',
-    ),
+    checkedInToday: rows.some((row) => row.day === day && row.kind === 'login'),
   };
 }
 function activityReport(mode: ActivityMode, period: string): ActivityReport {
@@ -175,9 +179,7 @@ function activityReport(mode: ActivityMode, period: string): ActivityReport {
     todayPoints: all
       .filter((row) => row.day === day)
       .reduce((sum, row) => sum + row.points, 0),
-    checkedInToday: all.some(
-      (row) => row.day === day && row.kind === 'login',
-    ),
+    checkedInToday: all.some((row) => row.day === day && row.kind === 'login'),
   };
 }
 
@@ -193,7 +195,9 @@ async function handleApi(
         ? input.href
         : input.url;
   const url = new URL(rawUrl, window.location.href);
-  const method = (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase();
+  const method = (
+    init?.method ?? (input instanceof Request ? input.method : 'GET')
+  ).toUpperCase();
   if (!url.pathname.startsWith('/api/')) return originalFetch(input, init);
 
   if (url.pathname === '/api/learning' && method === 'GET')
@@ -220,7 +224,12 @@ async function handleApi(
       if (body.kind === 'recognition') {
         const session = before.session;
         const word = before.words.find((item) => item.id === session?.queue[0]);
-        if (!session || !word || session.id !== body.sessionId || session.step !== body.step)
+        if (
+          !session ||
+          !word ||
+          session.id !== body.sessionId ||
+          session.step !== body.step
+        )
           return json({ error: '这张卡片已更新，请重新载入。' }, 409);
         next = answerRecognition(before, Boolean(body.known), body.step);
         award = addActivity({
@@ -233,14 +242,22 @@ async function handleApi(
       } else {
         const session = before.grammarSession;
         const question = session?.questions[body.step];
-        if (!session || !question || session.id !== body.sessionId || session.answers.length !== body.step)
+        if (
+          !session ||
+          !question ||
+          session.id !== body.sessionId ||
+          session.answers.length !== body.step
+        )
           return json({ error: '本轮题目已更新，请重新载入。' }, 409);
         const correct = gradeGrammar(question, String(body.answer ?? ''));
         next = {
           ...before,
           grammarSession: {
             ...session,
-            answers: [...session.answers, { answer: String(body.answer).trim(), correct }],
+            answers: [
+              ...session.answers,
+              { answer: String(body.answer).trim(), correct },
+            ],
           },
         };
         award = addActivity({
@@ -270,7 +287,10 @@ async function handleApi(
   if (url.pathname === '/api/activity' && method === 'POST') {
     try {
       const body = JSON.parse(await bodyText(input, init));
-      const correct = spellingCorrect(String(body.answer ?? ''), String(body.expected ?? ''));
+      const correct = spellingCorrect(
+        String(body.answer ?? ''),
+        String(body.expected ?? ''),
+      );
       return json(
         addActivity({
           eventId: String(body.eventId),
@@ -282,6 +302,24 @@ async function handleApi(
       );
     } catch {
       return json({ error: '答案格式不正确。' }, 400);
+    }
+  }
+  if (url.pathname === '/api/activity' && method === 'DELETE') {
+    try {
+      const payload = JSON.parse(await bodyText(input, init));
+      if (String(payload.pin ?? '') !== '1111')
+        return json({ error: '家长密码不正确。' }, 403);
+      const scope = payload.scope === 'all' ? 'all' : 'today';
+      const day = chinaDay();
+      const rows = activities();
+      const kept = rows.filter(
+        (row) =>
+          row.kind !== 'spelling' || (scope === 'today' && row.day !== day),
+      );
+      write(activityKey, kept);
+      return json({ deleted: rows.length - kept.length });
+    } catch {
+      return json({ error: '清理记录请求格式不正确。' }, 400);
     }
   }
   if (url.pathname === '/api/activity' && method === 'GET') {
@@ -301,7 +339,9 @@ async function handleApi(
       const tree = treeSpecies(String(body.treeId));
       if (!tree) return json({ error: '请选择有效的树种。' }, 400);
       const planted = read<LocalTree[]>(forestKey, []);
-      const existing = planted.find((item) => item.requestId === body.requestId);
+      const existing = planted.find(
+        (item) => item.requestId === body.requestId,
+      );
       if (existing) return json({ ...forestBalance(), plantedId: existing.id });
       if (forestBalance().available < tree.cost)
         return json({ error: `还差积分，暂时不能种下${tree.name}。` }, 409);
@@ -326,7 +366,9 @@ async function handleApi(
       const response = await originalFetch(
         `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`,
       );
-      const parsed = response.ok ? parseDictionary(await response.json(), word) : parseDictionary([], word);
+      const parsed = response.ok
+        ? parseDictionary(await response.json(), word)
+        : parseDictionary([], word);
       parsed.notices.push('GitHub 版使用公开词典录音；找不到时可用设备朗读。');
       return json(parsed);
     } catch {
@@ -341,7 +383,10 @@ async function handleApi(
     }
   }
   if (url.pathname === '/api/learning/image')
-    return json({ error: 'GitHub 版请填写网络图片地址；本地图片暂不上传。' }, 400);
+    return json(
+      { error: 'GitHub 版请填写网络图片地址；本地图片暂不上传。' },
+      400,
+    );
   return json({ error: '此功能在 GitHub 版暂不可用。' }, 404);
 }
 

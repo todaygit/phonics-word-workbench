@@ -5,6 +5,7 @@ import './github-runtime';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
+  AlertTriangle,
   BookMarked,
   BookOpen,
   Check,
@@ -48,6 +49,15 @@ import {
   validateLearning,
   type LearningData,
 } from './learning-model';
+import {
+  EMPTY_SPELLING_PLAN,
+  buildSpellingQueue,
+  normaliseSpellingStats,
+  statForDay,
+  updateSpellingStats,
+  type SpellingPlan,
+  type SpellingStats,
+} from './spelling-model';
 import {
   RecognitionView,
   GrammarView,
@@ -103,7 +113,7 @@ import {
 
 type WordStatus = 'new' | 'learning' | 'mastered';
 type QuizMode = 'sequence' | 'chapter' | 'random';
-type QuizType = 'missing' | 'full';
+type QuizType = 'missing' | 'full' | 'choice';
 
 type Chapter = {
   id: string;
@@ -186,9 +196,9 @@ function addDays(days: number) {
 const DEFAULT_SETTINGS: Settings = {
   newPerDay: 6,
   reviewPerDay: 12,
-  defaultQuizMode: 'sequence',
+  defaultQuizMode: 'random',
   defaultQuizType: 'missing',
-  quizCount: 10,
+  quizCount: 20,
   autoSpeak: false,
 };
 const DEFAULT_CHAPTERS = rawBank.chapters as Chapter[];
@@ -203,15 +213,15 @@ const DEFAULT_WORDS: Word[] = rawBank.words.map((item) => ({
 const modeInfo: Record<QuizMode, { title: string; description: string }> = {
   sequence: {
     title: '按学习顺序',
-    description: '从上次位置继续，严格按 v0.8 章节和词序测试。',
+    description: '在家长选定范围内按章节和词序测试。',
   },
   chapter: {
     title: '选择章节',
-    description: '家长或孩子勾选几个章节，章节内仍按学习顺序。',
+    description: '勾选章节，可指定单词或设置每章随机数量。',
   },
   random: {
     title: '随机挑战',
-    description: '从已启用词库中随机抽词，适合后期综合检查。',
+    description: '只在已测章节中随机抽题，错题优先。',
   },
 };
 const typeInfo: Record<QuizType, { title: string; description: string }> = {
@@ -222,6 +232,10 @@ const typeInfo: Record<QuizType, { title: string; description: string }> = {
   full: {
     title: '全单词测试',
     description: '听发音、看中文，完整拼写整个单词。',
+  },
+  choice: {
+    title: '四选一拼写',
+    description: '听发音、看中文，从四个拼写选项中选出正确答案。',
   },
 };
 
@@ -318,6 +332,15 @@ function Workbench() {
   const [completedToday, setCompletedToday] = useState(0);
   const [quizMode, setQuizMode] = useState<QuizMode>('sequence');
   const [quizType, setQuizType] = useState<QuizType>('missing');
+  const [quizSelection, setQuizSelection] = useState<'checked' | 'random'>(
+    'random',
+  );
+  const [wrongFirst, setWrongFirst] = useState(true);
+  const [testPlan, setTestPlan] = useState<SpellingPlan>(EMPTY_SPELLING_PLAN);
+  const [spellingStats, setSpellingStats] = useState<SpellingStats>({});
+  const [testSetupUnlocked, setTestSetupUnlocked] = useState(false);
+  const [pinPurpose, setPinPurpose] = useState<'settings' | 'test'>('settings');
+  const [wordPickerQuery, setWordPickerQuery] = useState('');
   const [selectedChapters, setSelectedChapters] = useState<string[]>([
     DEFAULT_CHAPTERS[0]?.id ?? '',
   ]);
@@ -358,6 +381,7 @@ function Workbench() {
         if (target) setParentTab(target);
         return;
       }
+      setPinPurpose('settings');
       setRequestedParentTab(target ?? null);
       setPin('');
       setPinError('');
@@ -370,6 +394,13 @@ function Workbench() {
     if (!validParentPin(pin)) {
       setPinError('密码不正确，请重新输入。');
       setPin('');
+      return;
+    }
+    if (pinPurpose === 'test') {
+      setTestSetupUnlocked(true);
+      setPinOpen(false);
+      setPin('');
+      setPinError('');
       return;
     }
     setSettingsUnlocked(true);
@@ -386,7 +417,16 @@ function Workbench() {
       setSettingsUnlocked(false);
       setParentOpen(false);
     }
+    if (nextTab !== 'test') setTestSetupUnlocked(false);
     setTab(nextTab);
+  }
+
+  function requestTestSetup() {
+    if (testSetupUnlocked) return;
+    setPinPurpose('test');
+    setPin('');
+    setPinError('');
+    setPinOpen(true);
   }
 
   useEffect(() => {
@@ -426,6 +466,33 @@ function Workbench() {
     setSettings(mergedSettings);
     setQuizMode(mergedSettings.defaultQuizMode);
     setQuizType(mergedSettings.defaultQuizType);
+    const storedPlan = loadStored<Partial<SpellingPlan>>(
+      'phonics.testPlan',
+      {},
+    );
+    const initialPlanChapters =
+      Array.isArray(storedPlan.selectedChapters) &&
+      storedPlan.selectedChapters.length
+        ? storedPlan.selectedChapters
+        : [DEFAULT_CHAPTERS[0]?.id ?? ''];
+    setTestPlan({
+      ...EMPTY_SPELLING_PLAN,
+      ...storedPlan,
+      selectedChapters: initialPlanChapters,
+      selectedWordIds: Array.isArray(storedPlan.selectedWordIds)
+        ? storedPlan.selectedWordIds
+        : [],
+      perChapter:
+        storedPlan.perChapter && typeof storedPlan.perChapter === 'object'
+          ? storedPlan.perChapter
+          : {},
+    });
+    setSelectedChapters(initialPlanChapters);
+    setQuizSelection(storedPlan.selection ?? EMPTY_SPELLING_PLAN.selection);
+    setWrongFirst(storedPlan.wrongFirst ?? true);
+    setSpellingStats(
+      normaliseSpellingStats(loadStored('phonics.spelling.stats', {})),
+    );
     setSequenceCursor(loadStored('phonics.sequenceCursor', 0));
     setCompletedToday(loadStored(`phonics.completed.${localDateKey()}`, 0));
     setHydrated(true);
@@ -445,11 +512,67 @@ function Workbench() {
       JSON.stringify(completedToday),
     );
     window.localStorage.setItem('phonics.bankVersion', BANK_VERSION);
-  }, [chapters, completedToday, hydrated, sequenceCursor, settings, words]);
+    window.localStorage.setItem(
+      'phonics.testPlan',
+      JSON.stringify({
+        ...testPlan,
+        mode: quizMode,
+        type: quizType,
+        selection: quizSelection,
+        wrongFirst,
+      }),
+    );
+    window.localStorage.setItem(
+      'phonics.spelling.stats',
+      JSON.stringify(spellingStats),
+    );
+  }, [
+    chapters,
+    completedToday,
+    hydrated,
+    quizMode,
+    quizSelection,
+    quizType,
+    sequenceCursor,
+    settings,
+    spellingStats,
+    testPlan,
+    words,
+    wrongFirst,
+  ]);
 
   const activeWords = useMemo(
     () => sortWords(words.filter((word) => word.active)),
     [words],
+  );
+  const todayKey = localDateKey();
+  const testedChapterIds = useMemo(
+    () => [
+      ...new Set(
+        activeWords
+          .filter((word) => (spellingStats[word.id]?.attempts ?? 0) > 0)
+          .map((word) => word.chapterId),
+      ),
+    ],
+    [activeWords, spellingStats],
+  );
+  const effectiveTestChapters =
+    testPlan.configuredDate === todayKey && testPlan.selectedChapters.length
+      ? testPlan.selectedChapters
+      : testedChapterIds.length
+        ? testedChapterIds
+        : selectedChapters;
+  const mistakeWords = useMemo(
+    () =>
+      activeWords.filter((word) => (spellingStats[word.id]?.wrong ?? 0) > 0),
+    [activeWords, spellingStats],
+  );
+  const todayMistakeWords = useMemo(
+    () =>
+      activeWords.filter(
+        (word) => statForDay(spellingStats[word.id], todayKey).wrong > 0,
+      ),
+    [activeWords, spellingStats, todayKey],
   );
   const orderedChapters = useMemo(
     () => [...chapters].sort((a, b) => a.order - b.order),
@@ -460,13 +583,6 @@ function Workbench() {
   const currentChapter =
     chapters.find((chapter) => chapter.id === currentLearningWord?.chapterId) ??
     chapters[0];
-  const dueWords = useMemo(
-    () =>
-      activeWords.filter(
-        (word) => word.status !== 'new' && word.nextReview <= localDateKey(),
-      ),
-    [activeWords],
-  );
   const filteredWords = useMemo(() => {
     const lower = query.trim().toLowerCase();
     return sortWords(
@@ -500,14 +616,32 @@ function Workbench() {
       ? (missingPrompt?.answer ?? '')
       : currentQuizWord.word
     : '';
+  const choiceOptions = useMemo(() => {
+    if (!currentQuizWord || session?.type !== 'choice') return [];
+    const alternatives = activeWords
+      .filter(
+        (word) =>
+          word.id !== currentQuizWord.id &&
+          word.word.toLowerCase() !== currentQuizWord.word.toLowerCase(),
+      )
+      .map((word) => word.word);
+    return shuffle([currentQuizWord.word, ...alternatives]).slice(0, 4);
+  }, [activeWords, currentQuizWord, session?.type]);
   const latestResult = results[results.length - 1];
-  const selectedQuizWordCount = activeWords.filter((word) =>
-    selectedChapters.includes(word.chapterId),
-  ).length;
   const launchCount =
-    quizMode === 'chapter'
-      ? selectedQuizWordCount
-      : Math.min(settings.quizCount, activeWords.length);
+    quizMode === 'chapter' && quizSelection === 'checked'
+      ? testPlan.selectedWordIds.length
+      : Math.min(
+          quizMode === 'chapter' && quizSelection === 'random'
+            ? Object.values(testPlan.perChapter).reduce(
+                (sum, count) => sum + Math.max(0, Number(count) || 0),
+                0,
+              ) || settings.quizCount
+            : testPlan.configuredDate === todayKey
+              ? settings.quizCount
+              : 20,
+          activeWords.length,
+        );
 
   useEffect(() => {
     setWordPage(1);
@@ -519,6 +653,25 @@ function Workbench() {
     if (!currentQuizWord || checked || quizFinished) return;
     setTimeout(() => answerRef.current?.focus(), 80);
   }, [checked, currentQuizWord, quizFinished]);
+
+  function updateQuizPlan(patch: Partial<SpellingPlan>) {
+    setTestPlan((current) => ({ ...current, ...patch }));
+  }
+
+  function selectQuizChapters(ids: string[]) {
+    setSelectedChapters(ids);
+    updateQuizPlan({ selectedChapters: ids, configuredDate: todayKey });
+  }
+
+  function toggleSelectedWord(wordId: string, checkedWord: boolean) {
+    setTestPlan((current) => ({
+      ...current,
+      configuredDate: todayKey,
+      selectedWordIds: checkedWord
+        ? [...new Set([...current.selectedWordIds, wordId])]
+        : current.selectedWordIds.filter((id) => id !== wordId),
+    }));
+  }
 
   useEffect(() => {
     type WebTool = {
@@ -581,7 +734,10 @@ function Workbench() {
             type: 'string',
             enum: ['sequence', 'chapter', 'random'],
           },
-          defaultQuizType: { type: 'string', enum: ['missing', 'full'] },
+          defaultQuizType: {
+            type: 'string',
+            enum: ['missing', 'full', 'choice'],
+          },
         },
         additionalProperties: false,
       },
@@ -661,34 +817,62 @@ function Workbench() {
   ]);
 
   function buildQuiz(mode = quizMode, type = quizType) {
+    if (!testSetupUnlocked) {
+      requestTestSetup();
+      return;
+    }
     if (!activeWords.length) {
       setQuizMessage('当前没有启用的单词，请到家长控制里启用或添加单词。');
       return;
     }
-    let queue: Word[] = [];
-    let startCursor = 0;
-    let cursorAdvance = 0;
-    if (mode === 'sequence') {
-      startCursor = sequenceCursor % activeWords.length;
-      queue = [
-        ...activeWords.slice(startCursor),
-        ...activeWords.slice(0, startCursor),
-      ].slice(0, Math.min(settings.quizCount, activeWords.length));
-      cursorAdvance = queue.length;
-    } else if (mode === 'chapter') {
-      queue = activeWords.filter((word) =>
-        selectedChapters.includes(word.chapterId),
-      );
-    } else {
-      queue = shuffle(activeWords).slice(
-        0,
-        Math.min(settings.quizCount, activeWords.length),
-      );
-    }
+    const selectedChaptersForPlan =
+      testPlan.configuredDate === todayKey && testPlan.selectedChapters.length
+        ? testPlan.selectedChapters
+        : effectiveTestChapters;
+    const chapterTotal = Object.values(testPlan.perChapter).reduce(
+      (sum, count) => sum + Math.max(0, Number(count) || 0),
+      0,
+    );
+    const defaultCount =
+      testPlan.configuredDate === todayKey ? settings.quizCount : 20;
+    const plan: SpellingPlan = {
+      ...testPlan,
+      mode,
+      type,
+      selection: quizSelection,
+      count:
+        mode === 'chapter' && quizSelection === 'random' && chapterTotal
+          ? chapterTotal
+          : defaultCount,
+      selectedChapters: selectedChaptersForPlan,
+      wrongFirst,
+      configuredDate: todayKey,
+    };
+    const queue = buildSpellingQueue(
+      activeWords,
+      plan,
+      spellingStats,
+      mode === 'random'
+        ? testedChapterIds.length
+          ? testedChapterIds
+          : selectedChaptersForPlan
+        : selectedChaptersForPlan,
+      shuffle,
+    );
+    const startCursor = activeWords.length
+      ? sequenceCursor % activeWords.length
+      : 0;
+    const cursorAdvance = mode === 'sequence' ? queue.length : 0;
     if (!queue.length) {
-      setQuizMessage('请至少选择一个有启用单词的章节。');
+      setQuizMessage(
+        quizSelection === 'checked'
+          ? '请至少勾选一个启用的单词。'
+          : '请至少选择一个有启用单词的章节，或先完成一些测试。',
+      );
       return;
     }
+    setTestPlan(plan);
+    setSelectedChapters(selectedChaptersForPlan);
     setQuizMessage('');
     pendingScore.current = null;
     setScoreAward(null);
@@ -700,49 +884,6 @@ function Workbench() {
       startCursor,
       cursorAdvance,
     });
-    setQuizIndex(0);
-    setQuizInput('');
-    setChecked(false);
-    setQuizFinished(false);
-    setResults([]);
-  }
-
-  function buildDailyQuiz() {
-    if (!activeWords.length) {
-      setQuizMessage('当前没有启用的单词，请到家长控制里启用或添加单词。');
-      setTab('test');
-      return;
-    }
-    const startCursor = sequenceCursor % activeWords.length;
-    const wrapped = [
-      ...activeWords.slice(startCursor),
-      ...activeWords.slice(0, startCursor),
-    ];
-    const fresh = wrapped
-      .filter((word) => word.status === 'new')
-      .slice(0, settings.newPerDay);
-    const reviews = dueWords.slice(0, settings.reviewPerDay);
-    const seen = new Set<string>();
-    const queue = [...reviews, ...fresh].filter((word) => {
-      if (seen.has(word.id)) return false;
-      seen.add(word.id);
-      return true;
-    });
-    if (!queue.length) {
-      buildQuiz('sequence', settings.defaultQuizType);
-      return;
-    }
-    setSession({
-      id: crypto.randomUUID(),
-      queue,
-      mode: 'sequence',
-      type: settings.defaultQuizType,
-      startCursor,
-      cursorAdvance: fresh.length,
-    });
-    pendingScore.current = null;
-    setScoreAward(null);
-    setQuizMessage('');
     setQuizIndex(0);
     setQuizInput('');
     setChecked(false);
@@ -799,6 +940,9 @@ function Workbench() {
         correct: isCorrect,
       },
     ]);
+    setSpellingStats((current) =>
+      updateSpellingStats(current, currentQuizWord.id, todayKey, isCorrect),
+    );
     setChecked(true);
     setCompletedToday((value) => value + 1);
     setWords((items) =>
@@ -987,6 +1131,62 @@ function Workbench() {
     setCompletedToday(0);
     setSettings(DEFAULT_SETTINGS);
     setSelectedChapters([DEFAULT_CHAPTERS[0]?.id ?? '']);
+    setTestPlan({
+      ...EMPTY_SPELLING_PLAN,
+      selectedChapters: [DEFAULT_CHAPTERS[0]?.id ?? ''],
+    });
+    setSpellingStats({});
+  }
+
+  async function clearSpellingRecords(scope: 'today' | 'all') {
+    try {
+      const response = await fetch('/api/activity', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scope, pin: '1111' }),
+      });
+      const body = (await response.json()) as {
+        deleted?: number;
+        error?: string;
+      };
+      if (!response.ok) throw new Error(body.error || '清理失败，请重试。');
+      if (scope === 'all') {
+        setSpellingStats({});
+      } else {
+        setSpellingStats((current) => {
+          const next: SpellingStats = {};
+          for (const [wordId, stat] of Object.entries(current)) {
+            const day = stat.days[todayKey];
+            if (!day) {
+              next[wordId] = stat;
+              continue;
+            }
+            const attempts = Math.max(0, stat.attempts - day.attempts);
+            const correct = Math.max(0, stat.correct - day.correct);
+            if (attempts > 0) {
+              const days = { ...stat.days };
+              delete days[todayKey];
+              next[wordId] = {
+                ...stat,
+                attempts,
+                correct,
+                wrong: attempts - correct,
+                days,
+              };
+            }
+          }
+          return next;
+        });
+      }
+      setCompletedToday(0);
+      setQuizMessage(
+        `已清理${scope === 'all' ? '全部' : '今日'}拼写测试记录（${body.deleted ?? 0} 条）。`,
+      );
+    } catch (reason) {
+      setQuizMessage(
+        reason instanceof Error ? reason.message : '清理失败，请重试。',
+      );
+    }
   }
 
   if (session) {
@@ -1080,13 +1280,26 @@ function Workbench() {
             <div className="missing-word" aria-label="缺字母单词">
               {missingPrompt?.mask}
             </div>
+          ) : session.type === 'choice' ? (
+            <div className="choice-answer-grid" aria-label="拼写选项">
+              {choiceOptions.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  className={quizInput === option ? 'selected' : ''}
+                  onClick={() => setQuizInput(option)}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
           ) : (
             <div className="listen-prompt">
               <Headphones />
               <span>听一听，拼出完整单词</span>
             </div>
           )}
-          {!checked ? (
+          {!checked && session.type !== 'choice' ? (
             <form
               className="answer-form"
               onSubmit={(event) => {
@@ -1124,6 +1337,17 @@ function Workbench() {
                     : '检查答案'}
               </Button>
             </form>
+          ) : !checked ? (
+            <div className="choice-submit">
+              <p>{quizInput ? `已选择：${quizInput}` : '请选择一个拼写答案'}</p>
+              <Button
+                className="primary-action"
+                onClick={() => void checkAnswer()}
+                disabled={!quizInput || scoreBusy}
+              >
+                <Check /> 检查答案
+              </Button>
+            </div>
           ) : (
             <div className="answer-feedback">
               <div className="feedback-title">
@@ -1188,6 +1412,7 @@ function Workbench() {
                 { value: 'today', label: '今日学习', icon: BookOpen },
                 { value: 'recognition', label: '单词背诵', icon: BookMarked },
                 { value: 'test', label: '拼写测试', icon: Target },
+                { value: 'mistakes', label: '错题记录', icon: AlertTriangle },
                 { value: 'grammar', label: '语法测试', icon: ListChecks },
                 { value: 'rewards', label: '积分种树', icon: Sprout },
                 { value: 'statistics', label: '学习统计', icon: BarChart3 },
@@ -1220,6 +1445,7 @@ function Workbench() {
                 today: '今日学习',
                 recognition: '单词背诵',
                 test: '拼写测试',
+                mistakes: '错题记录',
                 grammar: '语法测试',
                 rewards: '积分种树',
                 statistics: '学习统计',
@@ -1312,6 +1538,114 @@ function Workbench() {
             />
           )}
 
+          {tab === 'mistakes' && (
+            <section className="learning-view mistakes-view">
+              <div className="report-heading">
+                <div>
+                  <p className="eyebrow">SPELLING REVIEW</p>
+                  <h1>错题记录</h1>
+                  <p>错过的单词会自动提高出现优先级，直到练熟。</p>
+                </div>
+                <Button variant="outline" onClick={() => setTab('test')}>
+                  去做错题挑战 <ChevronRight />
+                </Button>
+              </div>
+              <div className="mistake-stats-cards">
+                <article>
+                  <span>今日错题</span>
+                  <strong>{todayMistakeWords.length}</strong>
+                  <small>今天答错过的不同单词</small>
+                </article>
+                <article>
+                  <span>累计错题</span>
+                  <strong>{mistakeWords.length}</strong>
+                  <small>历史上至少答错一次</small>
+                </article>
+                <article>
+                  <span>累计测试次数</span>
+                  <strong>
+                    {Object.values(spellingStats).reduce(
+                      (sum, stat) => sum + stat.attempts,
+                      0,
+                    )}
+                  </strong>
+                  <small>每个单词的总作答次数</small>
+                </article>
+              </div>
+              <div className="mistake-records panel">
+                <div className="mistake-record-heading">
+                  <h2>今天需要再看</h2>
+                  <Badge variant="secondary">
+                    {todayMistakeWords.length} 个
+                  </Badge>
+                </div>
+                {(todayMistakeWords.length ? todayMistakeWords : mistakeWords)
+                  .length ? (
+                  <div className="mistake-record-list">
+                    {(todayMistakeWords.length
+                      ? todayMistakeWords
+                      : mistakeWords
+                    ).map((word) => {
+                      const stat = spellingStats[word.id];
+                      const dayStat = statForDay(stat, todayKey);
+                      const chapter = chapters.find(
+                        (item) => item.id === word.chapterId,
+                      );
+                      return (
+                        <article key={word.id}>
+                          <div>
+                            <strong>{word.word}</strong>
+                            <small>
+                              {word.meaning} · {chapter?.title ?? '自定义章节'}
+                            </small>
+                          </div>
+                          <span>
+                            {dayStat.wrong
+                              ? `今日错 ${dayStat.wrong} 次 · `
+                              : ''}
+                            共测 {stat?.attempts ?? 0} 次 · 对{' '}
+                            {stat?.correct ?? 0} 次 · 错 {stat?.wrong ?? 0} 次
+                          </span>
+                        </article>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="empty-state">
+                    <CheckCircle2 /> 还没有错题，继续保持！
+                  </div>
+                )}
+              </div>
+              <div className="mistake-records panel">
+                <div className="mistake-record-heading">
+                  <h2>累计错题库</h2>
+                  <span>下次随机挑战会优先抽到这里的词</span>
+                </div>
+                {mistakeWords.length ? (
+                  <div className="mistake-record-list">
+                    {mistakeWords.map((word) => {
+                      const stat = spellingStats[word.id];
+                      return (
+                        <article key={word.id}>
+                          <div>
+                            <strong>{word.word}</strong>
+                            <small>{word.meaning}</small>
+                          </div>
+                          <span>
+                            测试 {stat?.attempts ?? 0} 次 · 拼对{' '}
+                            {stat?.correct ?? 0} 次 · 错 {stat?.wrong ?? 0} 次
+                          </span>
+                        </article>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="empty-state">累计错题会显示在这里。</div>
+                )}
+              </div>
+            </section>
+          )}
+
           {tab === 'test' && (
             <section className="test-center">
               <div className="page-title-row">
@@ -1319,136 +1653,362 @@ function Workbench() {
                   <p className="eyebrow">SPELLING TEST</p>
                   <h1>拼写测试中心</h1>
                   <p>
-                    先选测试范围，再选缺字母或完整拼写。初始默认按学习顺序。
+                    家长先设置今天的范围和题数，孩子再点击中间的挑战卡开始。
                   </p>
                 </div>
               </div>
               {quizMessage && (
                 <div className="notice-banner">{quizMessage}</div>
               )}
-              <div className="panel learning-note">
-                <h2>今日拼写计划</h2>
-                <p>
-                  按家长设置安排新词 {settings.newPerDay} 个、复习最多{' '}
-                  {settings.reviewPerDay} 个，只记录拼写结果。
+              <div className="spelling-launch-card panel">
+                <div className="spelling-launch-icon">
+                  {testSetupUnlocked ? <Play /> : <LockKeyhole />}
+                </div>
+                <p className="eyebrow">
+                  {testSetupUnlocked ? "TODAY'S CHALLENGE" : 'PARENT SETUP'}
                 </p>
-                <Button variant="outline" onClick={buildDailyQuiz}>
-                  开始今日拼写练习
+                <h2>
+                  {testSetupUnlocked
+                    ? '准备好开始挑战了吗？'
+                    : '请先由家长设置今天的测试'}
+                </h2>
+                <p>
+                  {testSetupUnlocked
+                    ? `${modeInfo[quizMode].title} · ${typeInfo[quizType].title} · ${launchCount} 题`
+                    : '测试范围、数量和拼写方式都由密码保护，孩子不能误改。'}
+                </p>
+                <Button
+                  className="primary-action"
+                  onClick={() =>
+                    testSetupUnlocked ? buildQuiz() : requestTestSetup()
+                  }
+                >
+                  {testSetupUnlocked ? <Play /> : <LockKeyhole />}
+                  {testSetupUnlocked ? '开始挑战' : '家长解锁设置'}
                 </Button>
               </div>
-              <div className="test-section">
-                <div className="section-number">1</div>
-                <div className="section-copy">
-                  <h2>测试范围</h2>
-                  <p>“按学习顺序”与“选择章节”都不打乱词序。</p>
-                </div>
-                <div className="choice-grid three">
-                  {(Object.keys(modeInfo) as QuizMode[]).map((mode) => (
-                    <button
-                      key={mode}
-                      className={`choice-card ${quizMode === mode ? 'selected' : ''}`}
-                      onClick={() => setQuizMode(mode)}
-                    >
-                      {mode === 'sequence' ? (
-                        <ListChecks />
-                      ) : mode === 'chapter' ? (
-                        <BookMarked />
-                      ) : (
-                        <Shuffle />
-                      )}
-                      <strong>{modeInfo[mode].title}</strong>
-                      <span>{modeInfo[mode].description}</span>
-                      {quizMode === mode && (
-                        <CheckCircle2 className="selected-check" />
-                      )}
-                    </button>
-                  ))}
-                </div>
+              <div className="test-quick-controls">
+                <button type="button" onClick={requestTestSetup}>
+                  <BookMarked /> 测试范围
+                  <small>
+                    {effectiveTestChapters.length
+                      ? `${effectiveTestChapters.length} 章`
+                      : '未选择'}
+                  </small>
+                </button>
+                <button type="button" onClick={requestTestSetup}>
+                  <Target /> 数量
+                  <small>{launchCount} 题</small>
+                </button>
+                <button type="button" onClick={requestTestSetup}>
+                  <Pencil /> 拼写方式
+                  <small>{typeInfo[quizType].title}</small>
+                </button>
+                <button type="button" onClick={requestTestSetup}>
+                  <Shuffle /> 排序与错题
+                  <small>{wrongFirst ? '错题优先' : '正常顺序'}</small>
+                </button>
               </div>
-              {quizMode === 'chapter' && (
-                <div className="chapter-picker panel">
-                  <div className="panel-heading">
+              {testSetupUnlocked && (
+                <div className="test-setup-panel panel">
+                  <div className="test-setup-heading">
                     <div>
-                      <h2>选择测试章节</h2>
-                      <p>可同时选择多个章节，测试时按章节原顺序进行。</p>
+                      <h2>今天的测试设置</h2>
+                      <p>设置完成后再点击上方“开始挑战”。</p>
                     </div>
-                    <Badge variant="secondary">
-                      已选 {selectedChapters.length} 章
-                    </Badge>
+                    <Badge variant="secondary">家长已解锁</Badge>
                   </div>
-                  <div className="chapter-checks">
-                    {orderedChapters.map((chapter) => (
-                      <label
-                        key={chapter.id}
-                        className={
-                          selectedChapters.includes(chapter.id) ? 'checked' : ''
-                        }
-                      >
-                        <Checkbox
-                          checked={selectedChapters.includes(chapter.id)}
-                          onCheckedChange={(value) =>
-                            setSelectedChapters((current) =>
-                              value
-                                ? [...new Set([...current, chapter.id])]
-                                : current.filter((id) => id !== chapter.id),
-                            )
+                  <div className="test-setup-grid">
+                    <fieldset>
+                      <legend>测试范围与顺序</legend>
+                      <div className="compact-choice-row">
+                        {(Object.keys(modeInfo) as QuizMode[]).map((mode) => (
+                          <button
+                            key={mode}
+                            type="button"
+                            className={quizMode === mode ? 'selected' : ''}
+                            onClick={() => {
+                              setQuizMode(mode);
+                              updateQuizPlan({
+                                mode,
+                                configuredDate: todayKey,
+                              });
+                            }}
+                          >
+                            {mode === 'sequence' ? (
+                              <ListChecks />
+                            ) : mode === 'chapter' ? (
+                              <BookMarked />
+                            ) : (
+                              <Shuffle />
+                            )}
+                            {modeInfo[mode].title}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="setup-hint">
+                        随机挑战只从已经测过的章节抽题；还没有历史时会使用当前选中的章节。
+                      </p>
+                    </fieldset>
+                    {quizMode !== 'random' && (
+                      <fieldset>
+                        <legend>章节范围</legend>
+                        <div className="chapter-checks compact">
+                          {orderedChapters.map((chapter) => (
+                            <label
+                              key={chapter.id}
+                              className={
+                                testPlan.selectedChapters.includes(chapter.id)
+                                  ? 'checked'
+                                  : ''
+                              }
+                            >
+                              <Checkbox
+                                checked={testPlan.selectedChapters.includes(
+                                  chapter.id,
+                                )}
+                                onCheckedChange={(value) =>
+                                  selectQuizChapters(
+                                    value
+                                      ? [
+                                          ...new Set([
+                                            ...testPlan.selectedChapters,
+                                            chapter.id,
+                                          ]),
+                                        ]
+                                      : testPlan.selectedChapters.filter(
+                                          (id) => id !== chapter.id,
+                                        ),
+                                  )
+                                }
+                              />
+                              <span>
+                                <strong>{chapter.title}</strong>
+                                <small>
+                                  {
+                                    words.filter(
+                                      (word) =>
+                                        word.chapterId === chapter.id &&
+                                        word.active,
+                                    ).length
+                                  }{' '}
+                                  个词
+                                </small>
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      </fieldset>
+                    )}
+                    <fieldset>
+                      <legend>抽题方式</legend>
+                      <div className="compact-choice-row">
+                        <button
+                          type="button"
+                          className={
+                            quizSelection === 'checked' ? 'selected' : ''
                           }
+                          onClick={() => {
+                            setQuizSelection('checked');
+                            updateQuizPlan({
+                              selection: 'checked',
+                              configuredDate: todayKey,
+                            });
+                          }}
+                        >
+                          <Check /> 指定勾选单词
+                        </button>
+                        <button
+                          type="button"
+                          className={
+                            quizSelection === 'random' ? 'selected' : ''
+                          }
+                          onClick={() => {
+                            setQuizSelection('random');
+                            updateQuizPlan({
+                              selection: 'random',
+                              configuredDate: todayKey,
+                            });
+                          }}
+                        >
+                          <Shuffle /> 随机抽题
+                        </button>
+                      </div>
+                      <label className="setup-number-field">
+                        总题数
+                        <Input
+                          type="number"
+                          min={1}
+                          max={100}
+                          value={String(testPlan.count || settings.quizCount)}
+                          onChange={(event) => {
+                            const count = Math.min(
+                              100,
+                              Math.max(1, Number(event.target.value) || 1),
+                            );
+                            updateQuizPlan({ count, configuredDate: todayKey });
+                            setSettings((current) => ({
+                              ...current,
+                              quizCount: count,
+                            }));
+                          }}
                         />
-                        <span>
-                          <strong>{chapter.title}</strong>
-                          <small>
-                            {
-                              words.filter(
-                                (word) =>
-                                  word.chapterId === chapter.id && word.active,
-                              ).length
-                            }{' '}
-                            个启用词
-                          </small>
-                        </span>
                       </label>
-                    ))}
+                    </fieldset>
+                    {quizSelection === 'random' && quizMode === 'chapter' && (
+                      <fieldset>
+                        <legend>每章随机抽几个</legend>
+                        <div className="chapter-quota-grid">
+                          {testPlan.selectedChapters.map((chapterId) => {
+                            const chapter = chapters.find(
+                              (item) => item.id === chapterId,
+                            );
+                            if (!chapter) return null;
+                            return (
+                              <label key={chapterId}>
+                                <span>{chapter.title}</span>
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  max={100}
+                                  value={String(
+                                    testPlan.perChapter[chapterId] ?? 0,
+                                  )}
+                                  onChange={(event) =>
+                                    updateQuizPlan({
+                                      perChapter: {
+                                        ...testPlan.perChapter,
+                                        [chapterId]: Math.min(
+                                          100,
+                                          Math.max(
+                                            0,
+                                            Number(event.target.value) || 0,
+                                          ),
+                                        ),
+                                      },
+                                      configuredDate: todayKey,
+                                    })
+                                  }
+                                />
+                              </label>
+                            );
+                          })}
+                        </div>
+                        <p className="setup-hint">
+                          多章节随机抽题时，每章都要填写具体数量；填 0
+                          表示该章今天不抽题。单章节可直接使用“总题数”。
+                        </p>
+                      </fieldset>
+                    )}
+                    {quizSelection === 'checked' && quizMode !== 'random' && (
+                      <fieldset className="word-picker-fieldset">
+                        <legend>
+                          指定单词（已选 {testPlan.selectedWordIds.length} 个）
+                        </legend>
+                        <Input
+                          value={wordPickerQuery}
+                          onChange={(event) =>
+                            setWordPickerQuery(event.target.value)
+                          }
+                          placeholder="搜索英文或中文"
+                        />
+                        <div className="word-picker-list">
+                          {activeWords
+                            .filter((word) =>
+                              testPlan.selectedChapters.includes(
+                                word.chapterId,
+                              ),
+                            )
+                            .filter((word) =>
+                              `${word.word} ${word.meaning}`
+                                .toLowerCase()
+                                .includes(wordPickerQuery.trim().toLowerCase()),
+                            )
+                            .slice(0, 80)
+                            .map((word) => (
+                              <label key={word.id}>
+                                <Checkbox
+                                  checked={testPlan.selectedWordIds.includes(
+                                    word.id,
+                                  )}
+                                  onCheckedChange={(value) =>
+                                    toggleSelectedWord(word.id, Boolean(value))
+                                  }
+                                />
+                                <span>
+                                  <strong>{word.word}</strong>
+                                  <small>{word.meaning}</small>
+                                </span>
+                                <em>
+                                  {spellingStats[word.id]?.attempts ?? 0} 次 ·
+                                  对 {spellingStats[word.id]?.correct ?? 0} 次
+                                </em>
+                              </label>
+                            ))}
+                        </div>
+                      </fieldset>
+                    )}
+                    <fieldset>
+                      <legend>拼写方式</legend>
+                      <div className="compact-choice-row">
+                        {(Object.keys(typeInfo) as QuizType[]).map((type) => (
+                          <button
+                            key={type}
+                            type="button"
+                            className={quizType === type ? 'selected' : ''}
+                            onClick={() => {
+                              setQuizType(type);
+                              updateQuizPlan({
+                                type,
+                                configuredDate: todayKey,
+                              });
+                            }}
+                          >
+                            {type === 'missing' ? (
+                              <Pencil />
+                            ) : type === 'choice' ? (
+                              <ListChecks />
+                            ) : (
+                              <Headphones />
+                            )}
+                            {typeInfo[type].title}
+                          </button>
+                        ))}
+                      </div>
+                    </fieldset>
+                    <label className="wrong-first-toggle">
+                      <Checkbox
+                        checked={wrongFirst}
+                        onCheckedChange={(value) => {
+                          setWrongFirst(Boolean(value));
+                          updateQuizPlan({
+                            wrongFirst: Boolean(value),
+                            configuredDate: todayKey,
+                          });
+                        }}
+                      />
+                      <span>
+                        <strong>优先安排以往错题</strong>
+                        <small>默认开启；错题仍按累计错误次数排序。</small>
+                      </span>
+                    </label>
                   </div>
                 </div>
               )}
-              <div className="test-section">
-                <div className="section-number">2</div>
-                <div className="section-copy">
-                  <h2>拼写方式</h2>
-                  <p>初期建议缺字母；熟悉后切换到完整单词。</p>
-                </div>
-                <div className="choice-grid two">
-                  {(Object.keys(typeInfo) as QuizType[]).map((type) => (
-                    <button
-                      key={type}
-                      className={`choice-card ${quizType === type ? 'selected' : ''}`}
-                      onClick={() => setQuizType(type)}
-                    >
-                      {type === 'missing' ? <Pencil /> : <Headphones />}
-                      <strong>{typeInfo[type].title}</strong>
-                      <span>{typeInfo[type].description}</span>
-                      {quizType === type && (
-                        <CheckCircle2 className="selected-check" />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="test-launch panel">
+              <div className="test-mistake-summary panel">
                 <div>
-                  <p className="eyebrow">准备好了</p>
-                  <h2>
-                    {modeInfo[quizMode].title} · {typeInfo[quizType].title}
-                  </h2>
-                  <p>
-                    本轮 {launchCount} 题
-                    {quizMode === 'chapter'
-                      ? '，覆盖所选章节中的全部启用词。'
-                      : '，可在家长控制中调整。'}
-                  </p>
+                  <AlertTriangle />
+                  <div>
+                    <h2>错题会自动回来</h2>
+                    <p>
+                      今日错题 {todayMistakeWords.length} 个 · 累计错题{' '}
+                      {mistakeWords.length} 个 · 已测章节{' '}
+                      {testedChapterIds.length} 章
+                    </p>
+                  </div>
                 </div>
-                <Button className="primary-action" onClick={() => buildQuiz()}>
-                  <Play /> 开始测试
+                <Button variant="outline" onClick={() => setTab('mistakes')}>
+                  查看错题记录
                 </Button>
               </div>
             </section>
@@ -1901,19 +2461,25 @@ function Workbench() {
                           <span className="chapter-cell" title={chapter?.title}>
                             {chapter?.title ?? '未分组'}
                           </span>
-                          <Switch
-                            checked={word.active}
-                            onCheckedChange={(value) =>
-                              setWords((items) =>
-                                items.map((item) =>
-                                  item.id === word.id
-                                    ? { ...item, active: value }
-                                    : item,
-                                ),
-                              )
-                            }
-                            aria-label={`在测试中${word.active ? '停用' : '启用'} ${word.word}`}
-                          />
+                          <span className="word-test-cell">
+                            <Switch
+                              checked={word.active}
+                              onCheckedChange={(value) =>
+                                setWords((items) =>
+                                  items.map((item) =>
+                                    item.id === word.id
+                                      ? { ...item, active: value }
+                                      : item,
+                                  ),
+                                )
+                              }
+                              aria-label={`在测试中${word.active ? '停用' : '启用'} ${word.word}`}
+                            />
+                            <small>
+                              测 {spellingStats[word.id]?.attempts ?? 0} · 对{' '}
+                              {spellingStats[word.id]?.correct ?? 0}
+                            </small>
+                          </span>
                           <span className="row-actions">
                             <Button
                               variant="ghost"
@@ -1998,7 +2564,8 @@ function Workbench() {
                     <output className="notice-banner">{quizMessage}</output>
                   )}
                   <p className="backup-storage-note">
-                    登录“家庭设备同步”后，认词词库、拼写词库、语法题库、学习进度、积分统计和已种的树都会保存到家庭云端；断网时仍保留在当前设备，联网后自动补同步。JSON 备份主要用于手动保存词库和学习设置，不替代家庭云同步。
+                    登录“家庭设备同步”后，认词词库、拼写词库、语法题库、学习进度、积分统计和已种的树都会保存到家庭云端；断网时仍保留在当前设备，联网后自动补同步。JSON
+                    备份主要用于手动保存词库和学习设置，不替代家庭云同步。
                   </p>
                   <div className="backup-grid">
                     <section className="backup-card">
@@ -2070,6 +2637,69 @@ function Workbench() {
                       </AlertDialog>
                     </section>
                   </div>
+                  <section className="record-management panel">
+                    <div className="record-management-heading">
+                      <div>
+                        <h2>测试记录管理</h2>
+                        <p>
+                          第一次使用前可以清理测试记录，方便家长先完整试用一遍。清理会重置错题次数、测试次数和拼写统计；已经种下的树会保留。
+                        </p>
+                      </div>
+                      <AlertTriangle />
+                    </div>
+                    <div className="record-management-actions">
+                      <AlertDialog>
+                        <AlertDialogTrigger
+                          render={<Button variant="outline" />}
+                        >
+                          清理今日拼写记录
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>
+                              清理今天的拼写记录？
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                              今日错题、测试次数和今日积分统计会被清除，词库本身不会改变。
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>取消</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => void clearSpellingRecords('today')}
+                            >
+                              确认清理
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                      <AlertDialog>
+                        <AlertDialogTrigger
+                          render={<Button variant="outline" />}
+                        >
+                          清理全部拼写记录
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>
+                              清理全部拼写记录？
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                              累计错题、测试次数、正确次数和拼写统计会全部清零，词库和已种的树会保留。
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>取消</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => void clearSpellingRecords('all')}
+                            >
+                              确认全部清理
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </section>
                 </TabsContent>
                 <TabsContent value="sync">
                   <CloudSyncPanel />
@@ -2252,10 +2882,12 @@ function Workbench() {
         <DialogContent className="pin-dialog">
           <DialogHeader>
             <DialogTitle>
-              <LockKeyhole /> 家长设置已上锁
+              <LockKeyhole />{' '}
+              {pinPurpose === 'test' ? '今日测试设置已上锁' : '家长设置已上锁'}
             </DialogTitle>
             <DialogDescription>
-              请输入 4 位家长密码后进入设置。
+              请输入 4 位家长密码后
+              {pinPurpose === 'test' ? '开始今日拼写测试' : '进入设置'}。
             </DialogDescription>
           </DialogHeader>
           <form
@@ -2279,7 +2911,7 @@ function Workbench() {
             {pinError && <output className="pin-error">{pinError}</output>}
             <DialogFooter>
               <Button type="submit" disabled={pin.length !== 4}>
-                解锁设置
+                {pinPurpose === 'test' ? '解锁今日测试' : '解锁设置'}
               </Button>
             </DialogFooter>
           </form>

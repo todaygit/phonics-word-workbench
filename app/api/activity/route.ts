@@ -123,3 +123,31 @@ export async function POST(request: Request) {
     return errorResponse(error);
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const user = identity(request);
+    sameOrigin(request);
+    if (!request.headers.get('content-type')?.startsWith('application/json'))
+      return json({ error: '请求格式不正确。' }, 415);
+    const body = (await request.json()) as { pin?: string; scope?: string };
+    if (body.pin !== '1111') return json({ error: '家长密码不正确。' }, 403);
+    const scope = body.scope === 'all' ? 'all' : 'today';
+    const statement =
+      scope === 'all'
+        ? bindings()
+            .DB.prepare(
+              `DELETE FROM learning_activity WHERE user_id = ? AND kind = 'spelling'`,
+            )
+            .bind(user)
+        : bindings()
+            .DB.prepare(
+              `DELETE FROM learning_activity WHERE user_id = ? AND kind = 'spelling' AND day = ?`,
+            )
+            .bind(user, chinaDay());
+    const result = await statement.run();
+    return json({ deleted: result.meta?.changes ?? 0 });
+  } catch (error) {
+    return errorResponse(error);
+  }
+}

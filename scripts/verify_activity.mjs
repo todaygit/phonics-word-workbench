@@ -129,6 +129,17 @@ function req(path, body, user = 'child-a', origin = base) {
     body: body === undefined ? undefined : JSON.stringify(body),
   });
 }
+function deleteReq(path, body, user = 'child-a', origin = base) {
+  return new Request(base + path, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      Origin: origin,
+      'oai-authenticated-user-id': user,
+    },
+    body: JSON.stringify(body),
+  });
+}
 function spell(
   word,
   answer = word,
@@ -393,27 +404,35 @@ try {
     assert.equal(data.totalPoints, 1);
     assert.equal(data.checkedInToday, true);
   });
-  await test('tree catalog spans 5 to 500 points', async () => {
+  await test('tree catalog spans 50 to 5000 points and toy unlocks every 100', async () => {
     assert.equal(model.TREE_CATALOG.length, 10);
-    assert.equal(Math.min(...model.TREE_CATALOG.map((tree) => tree.cost)), 5);
-    assert.equal(Math.max(...model.TREE_CATALOG.map((tree) => tree.cost)), 500);
+    assert.equal(Math.min(...model.TREE_CATALOG.map((tree) => tree.cost)), 50);
+    assert.equal(
+      Math.max(...model.TREE_CATALOG.map((tree) => tree.cost)),
+      5000,
+    );
     assert.equal(new Set(model.TREE_CATALOG.map((tree) => tree.id)).size, 10);
+    assert.equal(model.TOY_CATALOG.length, 10);
+    assert.deepEqual(
+      model.TOY_CATALOG.map((toy) => toy.unlockPoints),
+      [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000],
+    );
   });
   await test('planting spends available points and request retry is idempotent', async () => {
-    for (let i = 0; i < 4; i++) await postSpell(spell(`seed ${i}`), 'child-c');
+    for (let i = 0; i < 50; i++) await postSpell(spell(`seed ${i}`), 'child-c');
     const requestId = crypto.randomUUID();
     const body = { treeId: 'sprout', requestId };
     const plantRequest = () => req('/api/forest', body, 'child-c');
     let response = await forest.POST(plantRequest());
     assert.equal(response.status, 200);
     let data = await response.json();
-    assert.equal(data.available, 0);
+    assert.equal(data.available, 1);
     assert.equal(data.planted.length, 1);
     response = await forest.POST(plantRequest());
     assert.equal(response.status, 200);
     data = await response.json();
     assert.equal(data.planted.length, 1);
-    assert.equal(data.available, 0);
+    assert.equal(data.available, 1);
   });
   await test('cannot plant an unaffordable or unknown tree', async () => {
     let response = await forest.POST(
@@ -441,6 +460,18 @@ try {
     }
     assert.equal(model.reportPeriods('day', '2028-02', []).length, 29);
     assert.equal(model.reportPeriods('month', '2026', []).length, 12);
+  });
+  await test('parent PIN can clear spelling records while keeping the word bank and trees', async () => {
+    let response = await activity.DELETE(
+      deleteReq('/api/activity', { scope: 'all', pin: '0000' }, 'child-b'),
+    );
+    assert.equal(response.status, 403);
+    response = await activity.DELETE(
+      deleteReq('/api/activity', { scope: 'all', pin: '1111' }, 'child-b'),
+    );
+    assert.equal(response.status, 200);
+    assert.equal(typeof (await response.json()).deleted, 'number');
+    assert.equal((await report('year', '', 'child-b')).totalPoints, 0);
   });
   console.log(
     `Verified ${count} activity, atomic scoring, history and statistics checks.`,
