@@ -38,6 +38,17 @@ body {
   color: var(--foreground);
   font-family: 'Aptos', 'Segoe UI', 'Microsoft YaHei', sans-serif;
 }
+[data-slot='dialog-content'],
+[data-slot='alert-dialog-content'] {
+  background-color: #ffffff !important;
+  color: #172033;
+  opacity: 1;
+  box-shadow: 0 24px 80px #1720333d;
+}
+[data-slot='dialog-overlay'],
+[data-slot='alert-dialog-overlay'] {
+  background-color: #17203366 !important;
+}
 button,
 input,
 textarea {
