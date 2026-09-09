@@ -24,7 +24,7 @@ import {
   TREE_CATALOG,
   TOY_CATALOG,
 } from './activity-model';
-import { localCheckIn, localForest, localReport } from './github-activity';
+import { localCheckIn, localForest, localPlant, localReport } from './github-activity';
 
 function useReport(mode: ActivityMode, period: string) {
   const [report, setReport] = useState<ActivityReport | null>(null);
@@ -149,9 +149,12 @@ export function RewardsView() {
       setMessage(`${target.name}种好啦！它已经住进你的小树林。`);
       reload();
     } catch (reason) {
-      setMessage(
-        reason instanceof Error ? reason.message : '种树失败，请重试。',
-      );
+      try {
+        localPlant(target.id);
+        setRequestId(''); setMessage(`${target.name}种好啦！它已经住进你的小树林。`); reload();
+      } catch (localReason) {
+        setMessage(localReason instanceof Error ? localReason.message : reason instanceof Error ? reason.message : '种树失败，请重试。');
+      }
     } finally {
       setPlanting(false);
     }

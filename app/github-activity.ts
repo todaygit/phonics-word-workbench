@@ -1,11 +1,20 @@
 import { chinaDay, TREE_CATALOG, type ActivityReport, type ActivityRow } from './activity-model';
 
 type LocalEvent = { eventId: string; day: string; kind: 'spelling' | 'login'; itemKey: string; correct: boolean; points: number };
+type LocalTree = { id: string; treeId: string; treeName: string; cost: number; plantedAt: number };
 const KEY = 'phonics.github.activity';
+const TREES = 'phonics.github.trees';
 function read(): LocalEvent[] {
   try { const value = JSON.parse(localStorage.getItem(KEY) ?? '[]'); return Array.isArray(value) ? value : []; } catch { return []; }
 }
 function write(events: LocalEvent[]) { localStorage.setItem(KEY, JSON.stringify(events)); }
+function trees(): LocalTree[] { try { const value = JSON.parse(localStorage.getItem(TREES) ?? '[]'); return Array.isArray(value) ? value : []; } catch { return []; } }
+export function localPlant(treeId: string) {
+  const tree = TREE_CATALOG.find((item) => item.id === treeId); if (!tree) throw new Error('请选择有效的树种。');
+  const events = read(); const planted = trees(); const earned = events.reduce((sum, event) => sum + event.points, 0); const spent = planted.reduce((sum, item) => sum + item.cost, 0);
+  if (earned - spent < tree.cost) throw new Error(`还差积分，暂时不能种下${tree.name}。`);
+  const item = { id: crypto.randomUUID(), treeId: tree.id, treeName: tree.name, cost: tree.cost, plantedAt: Date.now() }; localStorage.setItem(TREES, JSON.stringify([...planted, item])); return item;
+}
 export function localAward(eventId: string, word: string, answer: string, expected: string) {
   const events = read(); const existing = events.find((event) => event.eventId === eventId);
   if (existing) return { points: existing.points, correct: existing.correct, day: existing.day };
@@ -26,6 +35,6 @@ export function localReport(): ActivityReport {
   return { rows: [...rows.values()].sort((a, b) => a.period.localeCompare(b.period)), totalPoints, startedOn: events[0]?.day ?? null, todayPoints: events.filter((event) => event.day === today).reduce((sum, event) => sum + event.points, 0), checkedInToday: events.some((event) => event.kind === 'login' && event.day === today) };
 }
 export function localForest() {
-  const events = read(); const earned = events.reduce((sum, event) => sum + event.points, 0); const today = chinaDay();
-  return { earned, spent: 0, available: earned, todayPoints: events.filter((event) => event.day === today).reduce((sum, event) => sum + event.points, 0), checkedInToday: events.some((event) => event.kind === 'login' && event.day === today), planted: [], catalog: TREE_CATALOG };
+  const events = read(); const planted = trees(); const earned = events.reduce((sum, event) => sum + event.points, 0); const spent = planted.reduce((sum, item) => sum + item.cost, 0); const today = chinaDay();
+  return { earned, spent, available: Math.max(0, earned - spent), todayPoints: events.filter((event) => event.day === today).reduce((sum, event) => sum + event.points, 0), checkedInToday: events.some((event) => event.kind === 'login' && event.day === today), planted, catalog: TREE_CATALOG };
 }
