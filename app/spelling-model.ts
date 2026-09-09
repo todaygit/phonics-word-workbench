@@ -19,13 +19,15 @@ export type SpellingStats = Record<string, SpellingStat>;
 
 export type SpellingPlan = {
   mode: 'sequence' | 'chapter' | 'random';
-  type: 'missing' | 'full' | 'choice';
+  type: 'missing' | 'full';
   selection: QuizSelection;
   count: number;
   selectedChapters: string[];
   selectedWordIds: string[];
   perChapter: Record<string, number>;
   wrongFirst: boolean;
+  missingCount: number;
+  missingMode: 'random' | 'phonics' | 'first';
   configuredDate: string;
 };
 
@@ -45,6 +47,8 @@ export const EMPTY_SPELLING_PLAN: SpellingPlan = {
   selectedWordIds: [],
   perChapter: {},
   wrongFirst: true,
+  missingCount: 1,
+  missingMode: 'random',
   configuredDate: '',
 };
 

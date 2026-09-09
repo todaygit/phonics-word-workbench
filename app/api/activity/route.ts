@@ -85,7 +85,6 @@ export async function POST(request: Request) {
       !body.expected.trim() ||
       body.expected.length > 200 ||
       typeof body.answer !== 'string' ||
-      !body.answer.trim() ||
       body.answer.length > 200
     )
       return json({ error: '答案格式不正确。' }, 400);

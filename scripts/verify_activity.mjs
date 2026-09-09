@@ -473,6 +473,17 @@ try {
     assert.equal(typeof (await response.json()).deleted, 'number');
     assert.equal((await report('year', '', 'child-b')).totalPoints, 0);
   });
+  await test('forgetting an answer is recorded as a wrong spelling attempt', async () => {
+    const before = (await report('year', '')).rows
+      .filter((item) => item.kind === 'spelling')
+      .reduce((sum, item) => sum + item.attempts, 0);
+    const response = await postSpell(spell('forgot', ''));
+    assert.equal(response.correct, false);
+    const after = (await report('year', '')).rows
+      .filter((item) => item.kind === 'spelling')
+      .reduce((sum, item) => sum + item.attempts, 0);
+    assert.equal(after, before + 1);
+  });
   console.log(
     `Verified ${count} activity, atomic scoring, history and statistics checks.`,
   );

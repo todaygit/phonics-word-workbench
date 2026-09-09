@@ -799,6 +799,19 @@ button {
   margin: 0 auto 22px;
   color: #68748a;
 }
+.direct-challenge-block {
+  margin-top: 12px;
+}
+.direct-challenge-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 12px;
+  color: #68748a;
+  font-size: 13px;
+}
 .test-quick-controls {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -866,6 +879,23 @@ button {
   font-weight: 700;
   font-size: 14px;
 }
+.range-progress-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 14px;
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #f3faf7;
+  color: #3e675c;
+}
+.range-progress-summary strong {
+  color: #1d705e;
+}
+.range-progress-summary small {
+  color: #6d7c8a;
+}
 .compact-choice-row {
   display: flex;
   flex-wrap: wrap;
@@ -889,6 +919,24 @@ button {
 }
 .compact-choice-row svg {
   width: 15px;
+}
+.missing-settings {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed #e0e5eb;
+}
+.missing-settings > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.missing-settings > div > span {
+  min-width: 86px;
+  color: #5e6d83;
+  font-size: 13px;
 }
 .chapter-checks.compact {
   max-height: 240px;
@@ -1771,6 +1819,71 @@ button {
   font-size: 32px;
   margin: 10px 0;
 }
+.progress-chart {
+  margin-bottom: 24px;
+  padding: 22px 24px 16px;
+}
+.progress-chart-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.progress-chart-heading h2 {
+  margin: 0 0 5px;
+  font-size: 19px;
+}
+.progress-chart-heading p,
+.progress-chart-heading strong {
+  color: #68748a;
+  font-size: 13px;
+}
+.progress-chart svg {
+  width: 100%;
+  height: 220px;
+  overflow: visible;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #f0fbf8, #fff 78%);
+}
+.chart-axis,
+.chart-grid-line {
+  vector-effect: non-scaling-stroke;
+  stroke-width: 0.7;
+}
+.chart-axis {
+  stroke: #bdd8d0;
+}
+.chart-grid-line {
+  stroke: #dcebe7;
+  stroke-dasharray: 2 2;
+}
+.chart-line {
+  fill: none;
+  stroke: #1c9a7a;
+  stroke-width: 1.8;
+  vector-effect: non-scaling-stroke;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.chart-dot {
+  fill: #fff;
+  stroke: #1c9a7a;
+  stroke-width: 1.3;
+  vector-effect: non-scaling-stroke;
+}
+.chart-labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  overflow: hidden;
+  margin-top: 8px;
+  color: #68748a;
+  font-size: 11px;
+}
+.muted-chart-label {
+  visibility: hidden;
+}
 .statistics-table {
   padding: 8px 20px 16px;
   overflow: hidden;
@@ -2223,6 +2336,18 @@ button {
   font-size: 21px;
   font-weight: 800;
 }
+.ipa-prompt {
+  margin: 14px 0 0;
+  color: #1b7c8e;
+  font-size: 20px;
+  font-weight: 700;
+}
+.ipa-prompt b {
+  margin-right: 7px;
+  color: #68748a;
+  font-size: 13px;
+  font-weight: 600;
+}
 .missing-word {
   margin: 8px 0 24px;
   color: #172033;
@@ -2263,6 +2388,11 @@ button {
 }
 .answer-form button {
   margin-top: 4px;
+}
+.answer-actions {
+  display: flex;
+  justify-content: center;
+  gap: 9px;
 }
 .answer-feedback {
   width: min(530px, 100%);

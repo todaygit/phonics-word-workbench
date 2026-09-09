@@ -132,12 +132,9 @@ export function RewardsView() {
     );
   const target =
     TREE_CATALOG.find((tree) => tree.id === selected) ?? TREE_CATALOG[0];
-  const targetUnlocked = forest.earned >= target.cost;
-  const progress = targetUnlocked
-    ? Math.min(100, (forest.available / target.cost) * 100)
-    : 0;
+  const progress = Math.min(100, (forest.available / target.cost) * 100);
   async function plant() {
-    if (planting || !targetUnlocked || progress < 100) return;
+    if (planting || progress < 100) return;
     setPlanting(true);
     setMessage('');
     const receipt = requestId || crypto.randomUUID();
@@ -218,18 +215,10 @@ export function RewardsView() {
             aria-pressed={selected === tree.id}
           >
             <span className="tree-symbol" aria-hidden="true">
-              {forest.earned >= tree.cost ? tree.symbol : '🎁'}
+              {tree.symbol}
             </span>
-            <strong>
-              {forest.earned >= tree.cost
-                ? tree.name
-                : `神秘盲盒 #${TREE_CATALOG.indexOf(tree) + 1}`}
-            </strong>
-            <small>
-              {forest.earned >= tree.cost
-                ? tree.note
-                : `累计 ${tree.cost} 分解锁 · 猜猜里面是什么`}
-            </small>
+            <strong>{tree.name}</strong>
+            <small>{tree.note}</small>
             <b>{tree.cost} 积分</b>
             {selected === tree.id && (
               <Check className="tree-selected" aria-label="已选择" />
@@ -241,39 +230,27 @@ export function RewardsView() {
         <article className={`growth-panel tree-${target.color}`}>
           <span className="growth-stage">我的目标 · {target.cost} 积分</span>
           <div className="target-tree-symbol" aria-hidden="true">
-            {targetUnlocked ? target.symbol : '🎁'}
+            {target.symbol}
           </div>
-          <h2>{targetUnlocked ? target.name : '神秘盲盒'}</h2>
-          <p>
-            {targetUnlocked
-              ? target.note
-              : `猜想：${target.note} · 累计获得 ${target.cost} 分后揭晓`}
-          </p>
+          <h2>{target.name}</h2>
+          <p>{target.note}</p>
           <Progress value={progress} aria-label={`${target.name}积分进度`} />
           <div className="growth-progress-label">
             <span>
               {forest.available} / {target.cost} 分
             </span>
             <span>
-              {!targetUnlocked
-                ? `还需累计获得 ${target.cost - forest.earned} 分解锁`
-                : forest.available >= target.cost
-                  ? '积分够啦，可以种下'
-                  : `还差 ${target.cost - forest.available} 分`}
+              {forest.available >= target.cost
+                ? '积分够啦，可以兑换'
+                : `还差 ${target.cost - forest.available} 分`}
             </span>
           </div>
           <Button
             className="plant-button"
-            disabled={
-              planting || !targetUnlocked || forest.available < target.cost
-            }
+            disabled={planting || forest.available < target.cost}
             onClick={() => void plant()}
           >
-            {planting
-              ? '正在种下…'
-              : targetUnlocked
-                ? `种下${target.name}`
-                : '达到积分后解锁'}
+            {planting ? '正在兑换…' : `兑换${target.name}`}
           </Button>
           {message && <output className="plant-message">{message}</output>}
         </article>
@@ -391,6 +368,18 @@ export function StatisticsView() {
   const spelling = sumRows(rows.filter((r) => r.kind === 'spelling'));
   const grammar = sumRows(rows.filter((r) => r.kind === 'grammar'));
   const periods = report ? reportPeriods(mode, period, rows) : [];
+  const chartValues = periods.map(
+    (label) => sumRows(rows.filter((row) => row.period === label)).studied,
+  );
+  const chartMax = Math.max(1, ...chartValues);
+  const chartPoints = chartValues
+    .map((value, index) => {
+      const x =
+        chartValues.length <= 1 ? 50 : (index / (chartValues.length - 1)) * 100;
+      const y = 94 - (value / chartMax) * 78;
+      return `${x},${y}`;
+    })
+    .join(' ');
   return (
     <section className="learning-view statistics-view">
       <div className="report-heading">
@@ -469,6 +458,71 @@ export function StatisticsView() {
               <strong>{sumRows(rows).points}</strong>
               <small>答对一次，积累一点成长</small>
             </article>
+          </div>
+          <div className="panel progress-chart">
+            <div className="progress-chart-heading">
+              <div>
+                <h2>学习数量变化</h2>
+                <p>折线越高，代表这段时间完成的学习越多。</p>
+              </div>
+              <strong>最高 {chartMax} 个</strong>
+            </div>
+            <svg
+              viewBox="0 0 100 100"
+              aria-label="学习数量折线图"
+              preserveAspectRatio="none"
+            >
+              <line x1="0" y1="94" x2="100" y2="94" className="chart-axis" />
+              <line
+                x1="0"
+                y1="55"
+                x2="100"
+                y2="55"
+                className="chart-grid-line"
+              />
+              <line
+                x1="0"
+                y1="16"
+                x2="100"
+                y2="16"
+                className="chart-grid-line"
+              />
+              <polyline points={chartPoints} className="chart-line" />
+              {chartValues.map((value, index) => {
+                const x =
+                  chartValues.length <= 1
+                    ? 50
+                    : (index / (chartValues.length - 1)) * 100;
+                const y = 94 - (value / chartMax) * 78;
+                return (
+                  <circle
+                    key={periods[index]}
+                    cx={x}
+                    cy={y}
+                    r="1.7"
+                    className="chart-dot"
+                  >
+                    <title>
+                      {periods[index]}：{value} 个
+                    </title>
+                  </circle>
+                );
+              })}
+            </svg>
+            <div className="chart-labels">
+              {periods.map((label, index) => (
+                <span
+                  key={label}
+                  className={
+                    index % Math.max(1, Math.ceil(periods.length / 8)) === 0
+                      ? ''
+                      : 'muted-chart-label'
+                  }
+                >
+                  {label}
+                </span>
+              ))}
+            </div>
           </div>
           {!learningRows.length && (
             <div className="notice-banner">

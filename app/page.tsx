@@ -113,7 +113,8 @@ import {
 
 type WordStatus = 'new' | 'learning' | 'mastered';
 type QuizMode = 'sequence' | 'chapter' | 'random';
-type QuizType = 'missing' | 'full' | 'choice';
+type QuizType = 'missing' | 'full';
+type MissingMode = 'random' | 'phonics' | 'first';
 
 type Chapter = {
   id: string;
@@ -156,6 +157,8 @@ type QuizSession = {
   type: QuizType;
   startCursor: number;
   cursorAdvance: number;
+  missingCount: number;
+  missingMode: MissingMode;
 };
 type QuizResult = {
   wordId: string;
@@ -233,10 +236,6 @@ const typeInfo: Record<QuizType, { title: string; description: string }> = {
     title: '全单词测试',
     description: '听发音、看中文，完整拼写整个单词。',
   },
-  choice: {
-    title: '四选一拼写',
-    description: '听发音、看中文，从四个拼写选项中选出正确答案。',
-  },
 };
 
 function sortWords(words: Word[]) {
@@ -264,24 +263,42 @@ function shuffle<T>(items: T[]) {
   return result;
 }
 
-function createMissingPrompt(word: string) {
+function createMissingPrompt(
+  word: string,
+  count = 1,
+  mode: MissingMode = 'random',
+  phonics = '',
+) {
   const letters = word.split('');
   const letterIndexes = letters
     .map((letter, index) => (/[a-z]/i.test(letter) ? index : -1))
     .filter((index) => index >= 0);
-  const blankCount =
-    letterIndexes.length <= 3 ? 1 : letterIndexes.length <= 6 ? 2 : 3;
+  const blankCount = Math.min(
+    Math.max(1, Math.floor(Number(count) || 1)),
+    letterIndexes.length,
+  );
   const chosen = new Set<number>();
-  for (let slot = 1; slot <= blankCount; slot += 1) {
-    chosen.add(
-      letterIndexes[
-        Math.round(((letterIndexes.length - 1) * slot) / (blankCount + 1))
-      ],
+  if (mode === 'first') {
+    letterIndexes.slice(0, blankCount).forEach((index) => chosen.add(index));
+  } else if (mode === 'phonics') {
+    const chunks = phonics.match(/[a-z]+/gi)?.filter(Boolean) ?? [];
+    const chunk = chunks.find((item) =>
+      word.toLowerCase().includes(item.toLowerCase()),
     );
+    const start = chunk ? word.toLowerCase().indexOf(chunk.toLowerCase()) : -1;
+    if (start >= 0) {
+      letterIndexes
+        .filter(
+          (index) => index >= start && index < start + (chunk?.length ?? 1),
+        )
+        .slice(0, blankCount)
+        .forEach((index) => chosen.add(index));
+    }
   }
-  for (const index of letterIndexes) {
-    if (chosen.size >= blankCount) break;
-    chosen.add(index);
+  if (mode === 'random' || chosen.size < blankCount) {
+    shuffle(letterIndexes)
+      .slice(0, blankCount)
+      .forEach((index) => chosen.add(index));
   }
   return {
     mask: letters
@@ -332,6 +349,8 @@ function Workbench() {
   const [completedToday, setCompletedToday] = useState(0);
   const [quizMode, setQuizMode] = useState<QuizMode>('sequence');
   const [quizType, setQuizType] = useState<QuizType>('missing');
+  const [missingCount, setMissingCount] = useState(1);
+  const [missingMode, setMissingMode] = useState<MissingMode>('random');
   const [quizSelection, setQuizSelection] = useState<'checked' | 'random'>(
     'random',
   );
@@ -341,6 +360,7 @@ function Workbench() {
   const [testSetupUnlocked, setTestSetupUnlocked] = useState(false);
   const [pinPurpose, setPinPurpose] = useState<'settings' | 'test'>('settings');
   const [wordPickerQuery, setWordPickerQuery] = useState('');
+  const [directChallengeOpen, setDirectChallengeOpen] = useState(false);
   const [selectedChapters, setSelectedChapters] = useState<string[]>([
     DEFAULT_CHAPTERS[0]?.id ?? '',
   ]);
@@ -463,13 +483,17 @@ function Workbench() {
       ...DEFAULT_SETTINGS,
       ...loadStored<Partial<Settings>>('phonics.settings', {}),
     };
-    setSettings(mergedSettings);
+    const safeQuizType: QuizType =
+      mergedSettings.defaultQuizType === 'full' ? 'full' : 'missing';
+    setSettings({ ...mergedSettings, defaultQuizType: safeQuizType });
     setQuizMode(mergedSettings.defaultQuizMode);
-    setQuizType(mergedSettings.defaultQuizType);
+    setQuizType(safeQuizType);
     const storedPlan = loadStored<Partial<SpellingPlan>>(
       'phonics.testPlan',
       {},
     );
+    const safePlanType: QuizType =
+      storedPlan.type === 'full' ? 'full' : 'missing';
     const initialPlanChapters =
       Array.isArray(storedPlan.selectedChapters) &&
       storedPlan.selectedChapters.length
@@ -478,6 +502,7 @@ function Workbench() {
     setTestPlan({
       ...EMPTY_SPELLING_PLAN,
       ...storedPlan,
+      type: safePlanType,
       selectedChapters: initialPlanChapters,
       selectedWordIds: Array.isArray(storedPlan.selectedWordIds)
         ? storedPlan.selectedWordIds
@@ -490,6 +515,14 @@ function Workbench() {
     setSelectedChapters(initialPlanChapters);
     setQuizSelection(storedPlan.selection ?? EMPTY_SPELLING_PLAN.selection);
     setWrongFirst(storedPlan.wrongFirst ?? true);
+    setMissingCount(
+      Math.max(1, Math.floor(Number(storedPlan.missingCount) || 1)),
+    );
+    setMissingMode(
+      storedPlan.missingMode === 'phonics' || storedPlan.missingMode === 'first'
+        ? storedPlan.missingMode
+        : 'random',
+    );
     setSpellingStats(
       normaliseSpellingStats(loadStored('phonics.spelling.stats', {})),
     );
@@ -556,6 +589,38 @@ function Workbench() {
     ],
     [activeWords, spellingStats],
   );
+  const learnedWords = useMemo(
+    () =>
+      activeWords.filter(
+        (word) =>
+          word.reviews > 0 || (spellingStats[word.id]?.attempts ?? 0) > 0,
+      ),
+    [activeWords, spellingStats],
+  );
+  const learnedChapterIds = useMemo(
+    () => [...new Set(learnedWords.map((word) => word.chapterId))],
+    [learnedWords],
+  );
+  const yesterdayKey = addDays(-1);
+  function chapterProgress(chapterId: string) {
+    const chapterWords = activeWords.filter(
+      (word) => word.chapterId === chapterId,
+    );
+    const tested = chapterWords.filter(
+      (word) => (spellingStats[word.id]?.attempts ?? 0) > 0,
+    ).length;
+    const yesterday = chapterWords.filter(
+      (word) => statForDay(spellingStats[word.id], yesterdayKey).attempts > 0,
+    ).length;
+    return {
+      total: chapterWords.length,
+      tested,
+      percent: chapterWords.length
+        ? Math.round((tested / chapterWords.length) * 100)
+        : 0,
+      yesterday,
+    };
+  }
   const effectiveTestChapters =
     testPlan.configuredDate === todayKey && testPlan.selectedChapters.length
       ? testPlan.selectedChapters
@@ -573,6 +638,17 @@ function Workbench() {
         (word) => statForDay(spellingStats[word.id], todayKey).wrong > 0,
       ),
     [activeWords, spellingStats, todayKey],
+  );
+  const rangeProgress = effectiveTestChapters.reduce(
+    (summary, chapterId) => {
+      const progress = chapterProgress(chapterId);
+      return {
+        total: summary.total + progress.total,
+        tested: summary.tested + progress.tested,
+        yesterday: summary.yesterday + progress.yesterday,
+      };
+    },
+    { total: 0, tested: 0, yesterday: 0 },
   );
   const orderedChapters = useMemo(
     () => [...chapters].sort((a, b) => a.order - b.order),
@@ -609,24 +685,18 @@ function Workbench() {
     chapters.find((chapter) => chapter.id === parentChapterId) ?? chapters[0];
   const currentQuizWord = session?.queue[quizIndex] ?? null;
   const missingPrompt = currentQuizWord
-    ? createMissingPrompt(currentQuizWord.word)
+    ? createMissingPrompt(
+        currentQuizWord.word,
+        session?.missingCount ?? missingCount,
+        session?.missingMode ?? missingMode,
+        currentQuizWord.phonics,
+      )
     : null;
   const expectedAnswer = currentQuizWord
     ? session?.type === 'missing'
       ? (missingPrompt?.answer ?? '')
       : currentQuizWord.word
     : '';
-  const choiceOptions = useMemo(() => {
-    if (!currentQuizWord || session?.type !== 'choice') return [];
-    const alternatives = activeWords
-      .filter(
-        (word) =>
-          word.id !== currentQuizWord.id &&
-          word.word.toLowerCase() !== currentQuizWord.word.toLowerCase(),
-      )
-      .map((word) => word.word);
-    return shuffle([currentQuizWord.word, ...alternatives]).slice(0, 4);
-  }, [activeWords, currentQuizWord, session?.type]);
   const latestResult = results[results.length - 1];
   const launchCount =
     quizMode === 'chapter' && quizSelection === 'checked'
@@ -736,7 +806,7 @@ function Workbench() {
           },
           defaultQuizType: {
             type: 'string',
-            enum: ['missing', 'full', 'choice'],
+            enum: ['missing', 'full'],
           },
         },
         additionalProperties: false,
@@ -853,6 +923,8 @@ function Workbench() {
           : defaultCount,
       selectedChapters: selectedChaptersForPlan,
       wrongFirst: effectiveWrongFirst,
+      missingCount,
+      missingMode,
       configuredDate: todayKey,
     };
     const queue = buildSpellingQueue(
@@ -890,6 +962,8 @@ function Workbench() {
       type: effectiveType,
       startCursor,
       cursorAdvance,
+      missingCount,
+      missingMode,
     });
     setQuizIndex(0);
     setQuizInput('');
@@ -898,11 +972,60 @@ function Workbench() {
     setResults([]);
   }
 
-  async function checkAnswer() {
+  function buildDirectChallenge(count: number) {
+    if (!learnedWords.length) {
+      setQuizMessage('还没有学过的单词，先完成一些单词背诵后再来挑战。');
+      return;
+    }
+    const plan: SpellingPlan = {
+      ...EMPTY_SPELLING_PLAN,
+      mode: 'random',
+      type: 'missing',
+      selection: 'random',
+      count,
+      selectedChapters: learnedChapterIds,
+      wrongFirst: true,
+      missingCount,
+      missingMode,
+      configuredDate: todayKey,
+    };
+    const queue = buildSpellingQueue(
+      learnedWords,
+      plan,
+      spellingStats,
+      learnedChapterIds,
+      shuffle,
+    );
+    if (!queue.length) {
+      setQuizMessage('暂时没有可挑战的已学单词。');
+      return;
+    }
+    setDirectChallengeOpen(false);
+    setQuizMessage('');
+    pendingScore.current = null;
+    setScoreAward(null);
+    setSession({
+      id: crypto.randomUUID(),
+      queue,
+      mode: 'random',
+      type: 'missing',
+      startCursor: 0,
+      cursorAdvance: 0,
+      missingCount,
+      missingMode,
+    });
+    setQuizIndex(0);
+    setQuizInput('');
+    setChecked(false);
+    setQuizFinished(false);
+    setResults([]);
+  }
+
+  async function checkAnswer(markForgotten = false) {
     if (
       !session ||
       !currentQuizWord ||
-      !quizInput.trim() ||
+      (!quizInput.trim() && !markForgotten && !pendingScore.current) ||
       checked ||
       scoreLocked.current
     )
@@ -913,7 +1036,7 @@ function Workbench() {
     const submitted = pendingScore.current ?? {
       eventId: `spell:${session.id}:${quizIndex}`,
       word: currentQuizWord.word,
-      answer: quizInput,
+      answer: markForgotten ? '' : quizInput,
       expected: expectedAnswer,
     };
     pendingScore.current = submitted;
@@ -1283,6 +1406,9 @@ function Workbench() {
             autoPlay={settings.autoSpeak && !checked}
             hideDetails={!checked}
           />
+          <p className="ipa-prompt">
+            <b>音标</b> {currentQuizWord.ipa || '暂无音标'}
+          </p>
           <p className="meaning-prompt">{currentQuizWord.meaning}</p>
           {quizMessage && (
             <output className="notice-banner">{quizMessage}</output>
@@ -1291,26 +1417,13 @@ function Workbench() {
             <div className="missing-word" aria-label="缺字母单词">
               {missingPrompt?.mask}
             </div>
-          ) : session.type === 'choice' ? (
-            <div className="choice-answer-grid" aria-label="拼写选项">
-              {choiceOptions.map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  className={quizInput === option ? 'selected' : ''}
-                  onClick={() => setQuizInput(option)}
-                >
-                  {option}
-                </button>
-              ))}
-            </div>
           ) : (
             <div className="listen-prompt">
               <Headphones />
               <span>听一听，拼出完整单词</span>
             </div>
           )}
-          {!checked && session.type !== 'choice' ? (
+          {!checked ? (
             <form
               className="answer-form"
               onSubmit={(event) => {
@@ -1335,30 +1448,29 @@ function Workbench() {
                   session.type === 'missing' ? '填入空缺字母' : '在这里拼写'
                 }
               />
-              <Button
-                type="submit"
-                className="primary-action"
-                disabled={!quizInput.trim() || scoreBusy}
-              >
-                <Check />{' '}
-                {scoreBusy
-                  ? '正在保存…'
-                  : pendingScore.current
-                    ? '重试保存答案'
-                    : '检查答案'}
-              </Button>
+              <div className="answer-actions">
+                <Button
+                  type="submit"
+                  className="primary-action"
+                  disabled={!quizInput.trim() || scoreBusy}
+                >
+                  <Check />{' '}
+                  {scoreBusy
+                    ? '正在保存…'
+                    : pendingScore.current
+                      ? '重试保存'
+                      : '提交'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={scoreBusy}
+                  onClick={() => void checkAnswer(true)}
+                >
+                  忘记了
+                </Button>
+              </div>
             </form>
-          ) : !checked ? (
-            <div className="choice-submit">
-              <p>{quizInput ? `已选择：${quizInput}` : '请选择一个拼写答案'}</p>
-              <Button
-                className="primary-action"
-                onClick={() => void checkAnswer()}
-                disabled={!quizInput || scoreBusy}
-              >
-                <Check /> 检查答案
-              </Button>
-            </div>
           ) : (
             <div className="answer-feedback">
               <div className="feedback-title">
@@ -1697,13 +1809,37 @@ function Workbench() {
                   {testSetupUnlocked ? <Play /> : <LockKeyhole />}
                   {testSetupUnlocked ? '开始挑战' : '家长解锁设置'}
                 </Button>
+                {!testSetupUnlocked && (
+                  <div className="direct-challenge-block">
+                    <Button
+                      variant="outline"
+                      onClick={() => setDirectChallengeOpen((open) => !open)}
+                    >
+                      <Shuffle /> 直接挑战
+                    </Button>
+                    {directChallengeOpen && (
+                      <div className="direct-challenge-options">
+                        <span>选择今天挑战数量：</span>
+                        {[10, 20, 40].map((count) => (
+                          <Button
+                            key={count}
+                            variant="outline"
+                            onClick={() => buildDirectChallenge(count)}
+                          >
+                            {count} 题
+                          </Button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="test-quick-controls">
                 <button type="button" onClick={requestTestSetup}>
                   <BookMarked /> 测试范围
                   <small>
                     {effectiveTestChapters.length
-                      ? `${effectiveTestChapters.length} 章`
+                      ? `${effectiveTestChapters.length} 章 · ${rangeProgress.tested}/${rangeProgress.total} · ${rangeProgress.total ? Math.round((rangeProgress.tested / rangeProgress.total) * 100) : 0}%`
                       : '未选择'}
                   </small>
                 </button>
@@ -1728,6 +1864,25 @@ function Workbench() {
                       <p>设置完成后再点击上方“开始挑战”。</p>
                     </div>
                     <Badge variant="secondary">家长已解锁</Badge>
+                  </div>
+                  <div className="range-progress-summary">
+                    <strong>当前总章节范围</strong>
+                    <span>
+                      共 {rangeProgress.total} 个 · 已测 {rangeProgress.tested}{' '}
+                      个 ·{' '}
+                      {rangeProgress.total
+                        ? Math.round(
+                            (rangeProgress.tested / rangeProgress.total) * 100,
+                          )
+                        : 0}
+                      %
+                    </span>
+                    <small>
+                      昨日测试 {rangeProgress.yesterday} 个
+                      {rangeProgress.yesterday
+                        ? ' · 已在记录中标注'
+                        : ' · 昨日暂无测试'}
+                    </small>
                   </div>
                   <div className="test-setup-grid">
                     <fieldset>
@@ -1796,14 +1951,12 @@ function Workbench() {
                               <span>
                                 <strong>{chapter.title}</strong>
                                 <small>
-                                  {
-                                    words.filter(
-                                      (word) =>
-                                        word.chapterId === chapter.id &&
-                                        word.active,
-                                    ).length
-                                  }{' '}
-                                  个词
+                                  {(() => {
+                                    const progress = chapterProgress(
+                                      chapter.id,
+                                    );
+                                    return `共 ${progress.total} 个 · 已测 ${progress.tested} 个 · ${progress.percent}% · 昨日测 ${progress.yesterday} 个`;
+                                  })()}
                                 </small>
                               </span>
                             </label>
@@ -1975,17 +2128,67 @@ function Workbench() {
                               });
                             }}
                           >
-                            {type === 'missing' ? (
-                              <Pencil />
-                            ) : type === 'choice' ? (
-                              <ListChecks />
-                            ) : (
-                              <Headphones />
-                            )}
+                            {type === 'missing' ? <Pencil /> : <Headphones />}
                             {typeInfo[type].title}
                           </button>
                         ))}
                       </div>
+                      {quizType === 'missing' && (
+                        <div className="missing-settings">
+                          <div>
+                            <span>缺几个字母</span>
+                            <div className="compact-choice-row">
+                              {[1, 2, 3, 4].map((count) => (
+                                <button
+                                  key={count}
+                                  type="button"
+                                  className={
+                                    missingCount === count ? 'selected' : ''
+                                  }
+                                  onClick={() => {
+                                    setMissingCount(count);
+                                    updateQuizPlan({
+                                      missingCount: count,
+                                      configuredDate: todayKey,
+                                    });
+                                  }}
+                                >
+                                  {count} 个
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <span>缺字母位置</span>
+                            <div className="compact-choice-row">
+                              {(
+                                [
+                                  ['random', '随机缺字母'],
+                                  ['phonics', '缺自然拼读字母'],
+                                  ['first', '缺首字母'],
+                                ] as const
+                              ).map(([mode, label]) => (
+                                <button
+                                  key={mode}
+                                  type="button"
+                                  className={
+                                    missingMode === mode ? 'selected' : ''
+                                  }
+                                  onClick={() => {
+                                    setMissingMode(mode);
+                                    updateQuizPlan({
+                                      missingMode: mode,
+                                      configuredDate: todayKey,
+                                    });
+                                  }}
+                                >
+                                  {label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </fieldset>
                     <label className="wrong-first-toggle">
                       <Checkbox
