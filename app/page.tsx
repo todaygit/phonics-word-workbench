@@ -36,7 +36,7 @@ import {
   Upload,
   XCircle,
 } from 'lucide-react';
-import rawBank from './word-bank-v08.json';
+import rawBank from './word-bank-v19.json';
 import { useLearning } from './use-learning';
 import { WordAudio } from './word-audio';
 import { RewardsView, StatisticsView } from './activity-views';
@@ -135,6 +135,7 @@ type Word = {
   phonics: string;
   meaning: string;
   example: string;
+  partOfSpeech?: string;
   audioUrl?: string;
   status: WordStatus;
   active: boolean;
@@ -167,7 +168,7 @@ type QuizResult = {
   correct: boolean;
 };
 
-const BANK_VERSION = 'v0.8';
+const BANK_VERSION = 'v1.9';
 const OLD_DEMO_IDS = new Set([
   'cat',
   'map',
@@ -473,7 +474,7 @@ function Workbench() {
       setChapters(loadStored<Chapter[]>('phonics.chapters', DEFAULT_CHAPTERS));
     } else {
       const customWords = storedWords.filter(
-        (word) => !OLD_DEMO_IDS.has(word.id),
+        (word) => !OLD_DEMO_IDS.has(word.id) && !word.id.startsWith('v08-'),
       );
       setWords([...DEFAULT_WORDS, ...customWords]);
       setChapters(DEFAULT_CHAPTERS);
@@ -523,8 +524,17 @@ function Workbench() {
         ? storedPlan.missingMode
         : 'random',
     );
+    const storedStats = normaliseSpellingStats(
+      loadStored('phonics.spelling.stats', {}),
+    );
     setSpellingStats(
-      normaliseSpellingStats(loadStored('phonics.spelling.stats', {})),
+      storedVersion === BANK_VERSION
+        ? storedStats
+        : Object.fromEntries(
+            Object.entries(storedStats).filter(
+              ([wordId]) => !wordId.startsWith('v08-'),
+            ),
+          ),
     );
     setSequenceCursor(loadStored('phonics.sequenceCursor', 0));
     setCompletedToday(loadStored(`phonics.completed.${localDateKey()}`, 0));
@@ -774,7 +784,7 @@ function Workbench() {
     register({
       name: 'get_phonics_workbench_summary',
       title: '查看自然拼读工作台概况',
-      description: '查看 v0.8 词库、当前学习位置和今日完成量，不修改数据。',
+      description: '查看 v1.9 词库、当前学习位置和今日完成量，不修改数据。',
       inputSchema: {
         type: 'object',
         properties: {},
@@ -1254,7 +1264,7 @@ function Workbench() {
     }
   }
 
-  function resetToV08() {
+  function resetToV19() {
     setChapters(DEFAULT_CHAPTERS);
     setWords(DEFAULT_WORDS);
     setSequenceCursor(0);
@@ -2464,7 +2474,7 @@ function Workbench() {
                   <div className="library-summary">
                     <div>
                       <p className="eyebrow">当前词库</p>
-                      <h2>自然拼读背单词小手册 · v0.8</h2>
+                      <h2>自然拼读背单词小手册 · v1.9</h2>
                       <p>
                         {chapters.length} 个章节 · {words.length} 条词条 ·{' '}
                         {activeWords.length} 条已启用
@@ -2821,9 +2831,9 @@ function Workbench() {
                       <div className="backup-icon orange-bg">
                         <RotateCcw />
                       </div>
-                      <h2>恢复 v0.8 原始词库</h2>
+                      <h2>恢复 v1.9 原始词库</h2>
                       <p>
-                        只重置拼写词库和拼写进度，回到原始的 33 章、1,785
+                        只重置拼写词库和拼写进度，回到原始的 75 章、2,490
                         条词。不会影响认词和语法。
                       </p>
                       <AlertDialog>
@@ -2835,7 +2845,7 @@ function Workbench() {
                         <AlertDialogContent>
                           <AlertDialogHeader>
                             <AlertDialogTitle>
-                              确定恢复 v0.8 原始词库？
+                              确定恢复 v1.9 原始词库？
                             </AlertDialogTitle>
                             <AlertDialogDescription>
                               当前词库修改会被覆盖。建议先导出备份。
@@ -2843,7 +2853,7 @@ function Workbench() {
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>取消</AlertDialogCancel>
-                            <AlertDialogAction onClick={resetToV08}>
+                            <AlertDialogAction onClick={resetToV19}>
                               确认恢复
                             </AlertDialogAction>
                           </AlertDialogFooter>

@@ -363,7 +363,7 @@ export function RecognitionView({
             <div className="learning-empty">
               <h2>还没有录入认词单词</h2>
               <p>
-                从“设置 → 家长控制 → 认词词库”录入当天新词，也可以复制已有 v0.8
+                从“设置 → 家长控制 → 认词词库”录入当天新词，也可以复制已有 v1.9
                 章节。不会自动加入默写。
               </p>
               <Button variant="outline" onClick={manage}>
@@ -863,7 +863,7 @@ export function RecognitionLibrary({
           disabled={disabled || !copyChapter}
           onClick={async () => {
             const chapter =
-              sourceChapters.find((c) => c.id === copyChapter)?.title ?? 'v0.8';
+              sourceChapters.find((c) => c.id === copyChapter)?.title ?? 'v1.9';
             const additions = sourceWords
               .filter(
                 (w) =>
@@ -877,7 +877,7 @@ export function RecognitionLibrary({
                   phonics: w.phonics,
                   example: w.example,
                   chapter,
-                  source: 'v0.8 工作台词库例句（非 RAZ）',
+                  source: 'v1.9 工作台词库例句（非 RAZ）',
                 }),
               );
             if (

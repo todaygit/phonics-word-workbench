@@ -2,12 +2,12 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const bank = JSON.parse(
-  readFileSync(new URL('../app/word-bank-v08.json', import.meta.url), 'utf8'),
+  readFileSync(new URL('../app/word-bank-v19.json', import.meta.url), 'utf8'),
 );
 
-assert.equal(bank.version, 'v0.8');
-assert.equal(bank.chapters.length, 33);
-assert.equal(bank.words.length, 1785);
+assert.equal(bank.version, 'v1.9');
+assert.equal(bank.chapters.length, 75);
+assert.equal(bank.words.length, 2490);
 assert.equal(
   new Set(bank.words.map((word) => word.id)).size,
   bank.words.length,
@@ -42,5 +42,5 @@ for (const word of bank.words) {
 }
 
 console.log(
-  'Verified v0.8: 33 chapters, 1,785 complete word rows, no missing Chinese meanings.',
+  'Verified v1.9: 75 chapters, 2,490 complete word rows, no missing Chinese meanings.',
 );
