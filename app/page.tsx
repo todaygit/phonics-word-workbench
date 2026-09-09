@@ -1130,6 +1130,10 @@ function Workbench() {
     setSequenceCursor(0);
     setCompletedToday(0);
     setSettings(DEFAULT_SETTINGS);
+    setQuizMode(DEFAULT_SETTINGS.defaultQuizMode);
+    setQuizType(DEFAULT_SETTINGS.defaultQuizType);
+    setQuizSelection('random');
+    setWrongFirst(true);
     setSelectedChapters([DEFAULT_CHAPTERS[0]?.id ?? '']);
     setTestPlan({
       ...EMPTY_SPELLING_PLAN,
