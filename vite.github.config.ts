@@ -21,7 +21,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes('word-bank-v08.json')) return 'word-bank';
+          if (id.includes('word-bank-v19.json')) return 'word-bank';
           if (id.includes('lucide-react')) return 'icons';
           if (id.includes('@base-ui')) return 'ui';
           if (id.includes('node_modules')) return 'vendor';
