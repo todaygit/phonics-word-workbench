@@ -825,8 +825,13 @@ function Workbench() {
       setQuizMessage('当前没有启用的单词，请到家长控制里启用或添加单词。');
       return;
     }
+    const configuredToday = testPlan.configuredDate === todayKey;
+    const effectiveMode = configuredToday ? mode : 'random';
+    const effectiveType = configuredToday ? type : settings.defaultQuizType;
+    const effectiveSelection = configuredToday ? quizSelection : 'random';
+    const effectiveWrongFirst = configuredToday ? wrongFirst : true;
     const selectedChaptersForPlan =
-      testPlan.configuredDate === todayKey && testPlan.selectedChapters.length
+      configuredToday && testPlan.selectedChapters.length
         ? testPlan.selectedChapters
         : effectiveTestChapters;
     const chapterTotal = Object.values(testPlan.perChapter).reduce(
@@ -837,22 +842,24 @@ function Workbench() {
       testPlan.configuredDate === todayKey ? settings.quizCount : 20;
     const plan: SpellingPlan = {
       ...testPlan,
-      mode,
-      type,
-      selection: quizSelection,
+      mode: effectiveMode,
+      type: effectiveType,
+      selection: effectiveSelection,
       count:
-        mode === 'chapter' && quizSelection === 'random' && chapterTotal
+        effectiveMode === 'chapter' &&
+        effectiveSelection === 'random' &&
+        chapterTotal
           ? chapterTotal
           : defaultCount,
       selectedChapters: selectedChaptersForPlan,
-      wrongFirst,
+      wrongFirst: effectiveWrongFirst,
       configuredDate: todayKey,
     };
     const queue = buildSpellingQueue(
       activeWords,
       plan,
       spellingStats,
-      mode === 'random'
+      effectiveMode === 'random'
         ? testedChapterIds.length
           ? testedChapterIds
           : selectedChaptersForPlan
@@ -862,10 +869,10 @@ function Workbench() {
     const startCursor = activeWords.length
       ? sequenceCursor % activeWords.length
       : 0;
-    const cursorAdvance = mode === 'sequence' ? queue.length : 0;
+    const cursorAdvance = effectiveMode === 'sequence' ? queue.length : 0;
     if (!queue.length) {
       setQuizMessage(
-        quizSelection === 'checked'
+        effectiveSelection === 'checked'
           ? '请至少勾选一个启用的单词。'
           : '请至少选择一个有启用单词的章节，或先完成一些测试。',
       );
@@ -879,8 +886,8 @@ function Workbench() {
     setSession({
       id: crypto.randomUUID(),
       queue,
-      mode,
-      type,
+      mode: effectiveMode,
+      type: effectiveType,
       startCursor,
       cursorAdvance,
     });
