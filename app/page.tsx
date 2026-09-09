@@ -45,6 +45,7 @@ import { InstallAppPanel } from './pwa-install';
 import {
   CloudSyncPanel,
   CloudSyncProvider,
+  recoverLocalSafetyBackup,
   saveLocalSafetyBackup,
 } from './cloud-sync';
 import type { Award } from './activity-model';
@@ -479,6 +480,7 @@ function Workbench() {
   }, []);
 
   useEffect(() => {
+    recoverLocalSafetyBackup();
     // Preserve the current device state before any bank/schema migration runs.
     // This is intentionally kept outside the cloud snapshot namespace.
     saveLocalSafetyBackup('应用更新前');

@@ -150,6 +150,31 @@ export function saveLocalSafetyBackup(reason = '自动备份') {
   window.localStorage.setItem(LOCAL_BACKUPS_KEY, JSON.stringify(next));
 }
 
+/** Recover only when a rollback/restore left the key completely absent. Never
+ * overwrite a non-empty current value, so intentional edits remain intact. */
+export function recoverLocalSafetyBackup() {
+  if (typeof window === 'undefined') return false;
+  try {
+    const parsed = JSON.parse(
+      window.localStorage.getItem(LOCAL_BACKUPS_KEY) ?? '[]',
+    ) as LocalSafetyBackup[];
+    const latest = Array.isArray(parsed) ? parsed.at(-1) : null;
+    if (!latest?.items) return false;
+    let recovered = false;
+    for (const key of ['phonics.github.activity', 'phonics.github.forest']) {
+      const current = window.localStorage.getItem(key);
+      const previous = latest.items[key];
+      if ((!current || current === '[]') && previous && previous !== '[]') {
+        window.localStorage.setItem(key, previous);
+        recovered = true;
+      }
+    }
+    return recovered;
+  } catch {
+    return false;
+  }
+}
+
 function restoreSnapshot(snapshot: Snapshot) {
   const current = collectSnapshot();
   saveLocalSafetyBackup('云端记录覆盖前');
