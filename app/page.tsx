@@ -309,6 +309,13 @@ function createMissingPrompt(
   };
 }
 
+function maskExampleSentence(example: string, word: string) {
+  if (!example.trim()) return '暂无例句';
+  if (!word.trim()) return example;
+  const escaped = word.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return example.replace(new RegExp(`\\b${escaped}\\b`, 'gi'), '____');
+}
+
 function makeBlankWord(chapter: Chapter): Word {
   return {
     id: `custom-${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -1414,12 +1421,25 @@ function Workbench() {
             ipa={currentQuizWord.ipa}
             preferredUrl={currentQuizWord.audioUrl}
             autoPlay={settings.autoSpeak && !checked}
-            hideDetails={!checked}
           />
           <p className="ipa-prompt">
             <b>音标</b> {currentQuizWord.ipa || '暂无音标'}
           </p>
-          <p className="meaning-prompt">{currentQuizWord.meaning}</p>
+          <div className="quiz-word-details">
+            <p className="meaning-prompt">
+              <b>中文</b> {currentQuizWord.meaning || '暂无释义'}
+            </p>
+            <p className="meaning-prompt">
+              <b>词性</b> {currentQuizWord.partOfSpeech || '未填写'}
+            </p>
+            <p className="meaning-prompt">
+              <b>拆分</b> {currentQuizWord.phonics || '未填写'}
+            </p>
+            <p className="meaning-prompt">
+              <b>例句</b>{' '}
+              {maskExampleSentence(currentQuizWord.example, currentQuizWord.word)}
+            </p>
+          </div>
           {quizMessage && (
             <output className="notice-banner">{quizMessage}</output>
           )}
@@ -1493,8 +1513,16 @@ function Workbench() {
               </div>
               <div className="word-details">
                 <span>
+                  <b>中文</b>
+                  {currentQuizWord.meaning || '未填写'}
+                </span>
+                <span>
                   <b>音标</b>
                   {currentQuizWord.ipa || '未填写'}
+                </span>
+                <span>
+                  <b>词性</b>
+                  {currentQuizWord.partOfSpeech || '未填写'}
                 </span>
                 <span>
                   <b>拆分</b>
@@ -1502,7 +1530,7 @@ function Workbench() {
                 </span>
                 <span>
                   <b>例句</b>
-                  {currentQuizWord.example || '未填写'}
+                  {maskExampleSentence(currentQuizWord.example, currentQuizWord.word)}
                 </span>
               </div>
               {scoreAward?.correct && (
