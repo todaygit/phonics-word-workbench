@@ -1421,6 +1421,7 @@ function Workbench() {
             ipa={currentQuizWord.ipa}
             preferredUrl={currentQuizWord.audioUrl}
             autoPlay={settings.autoSpeak && !checked}
+            hideDetails
           />
           <p className="ipa-prompt">
             <b>音标</b> {currentQuizWord.ipa || '暂无音标'}
@@ -1571,17 +1572,19 @@ function Workbench() {
             <SidebarMenu className="app-navigation">
               {[
                 { value: 'today', label: '今日学习', icon: BookOpen },
-                { value: 'recognition', label: '单词背诵', icon: BookMarked },
+                { value: 'recognition', label: '单词背诵', icon: BookMarked, disabled: true },
                 { value: 'test', label: '拼写测试', icon: Target },
                 { value: 'mistakes', label: '错题记录', icon: AlertTriangle },
-                { value: 'grammar', label: '语法测试', icon: ListChecks },
+                { value: 'grammar', label: '语法测试', icon: ListChecks, disabled: true },
                 { value: 'rewards', label: '积分种树', icon: Sprout },
                 { value: 'statistics', label: '学习统计', icon: BarChart3 },
                 { value: 'settings', label: '设置', icon: Settings2 },
-              ].map(({ value, label, icon: Icon }) => (
+              ].map(({ value, label, icon: Icon, disabled }) => (
                 <SidebarMenuItem key={value}>
                   <SidebarMenuButton
                     isActive={tab === value}
+                    disabled={disabled}
+                    title={disabled ? `${label}（尚未启用）` : label}
                     aria-current={tab === value ? 'page' : undefined}
                     onClick={() =>
                       value === 'settings'
@@ -1591,6 +1594,7 @@ function Workbench() {
                   >
                     <Icon />
                     <span>{label}</span>
+                    {disabled && <small className="nav-disabled-note">尚未启用</small>}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -1652,8 +1656,8 @@ function Workbench() {
                   </p>
                   <p className="muted">看单词和图片，口头回答，不要求默写。</p>
                 </div>
-                <Button onClick={() => setTab('recognition')}>
-                  去背单词 <ChevronRight />
+                <Button disabled title="尚未启用">
+                  尚未启用
                 </Button>
               </div>
               <div className="today-secondary">
@@ -1675,8 +1679,8 @@ function Workbench() {
                     {learning.data.grammar.filter((q) => q.active).length}{' '}
                     道已启用题目 · 选择题与填空题
                   </p>
-                  <Button variant="outline" onClick={() => setTab('grammar')}>
-                    去测语法
+                  <Button variant="outline" disabled title="尚未启用">
+                    尚未启用
                   </Button>
                 </div>
               </div>

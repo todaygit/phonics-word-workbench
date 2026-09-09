@@ -78,14 +78,32 @@ button {
   border-radius: 10px;
   font-size: 15px;
   color: #657186;
+  border: 1px solid transparent;
+  transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
 }
 .app-navigation [data-slot='sidebar-menu-button']:hover {
   background: #f4f6f9;
 }
 .app-navigation [data-slot='sidebar-menu-button'][data-active] {
-  background: #edf2f7;
+  background: #ffffff;
   color: #172033;
   font-weight: 700;
+  border-color: #d8e2ec;
+  box-shadow: 0 7px 16px #1720331c, inset 3px 0 0 #ff6b45;
+  transform: translateX(4px);
+}
+.app-navigation [data-slot='sidebar-menu-button']:disabled {
+  color: #aeb7c4;
+  background: #f7f8fa;
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+.app-navigation .nav-disabled-note {
+  margin-left: auto;
+  color: #b3bbc6;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 .app-navigation [data-slot='sidebar-menu-button'] svg {
   width: 19px;
@@ -2335,6 +2353,30 @@ button {
   margin: 22px 0 12px;
   font-size: 21px;
   font-weight: 800;
+}
+.quiz-word-details {
+  width: min(560px, 100%);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 18px;
+  margin: 2px 0 14px;
+  color: #4f5d70;
+  text-align: left;
+}
+.quiz-word-details .meaning-prompt {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.quiz-word-details .meaning-prompt:last-child {
+  grid-column: 1 / -1;
+}
+.quiz-word-details .meaning-prompt b {
+  display: inline-block;
+  min-width: 42px;
+  color: #172033;
+  font-size: 12px;
 }
 .ipa-prompt {
   margin: 14px 0 0;
