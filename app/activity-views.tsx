@@ -218,7 +218,7 @@ export function RewardsView() {
             aria-pressed={selected === tree.id}
           >
             <span className="tree-symbol" aria-hidden="true">
-              {tree.symbol}
+              {forest.earned >= tree.cost ? tree.symbol : '🎁'}
             </span>
             <strong>
               {forest.earned >= tree.cost
@@ -241,7 +241,7 @@ export function RewardsView() {
         <article className={`growth-panel tree-${target.color}`}>
           <span className="growth-stage">我的目标 · {target.cost} 积分</span>
           <div className="target-tree-symbol" aria-hidden="true">
-            {target.symbol}
+            {targetUnlocked ? target.symbol : '🎁'}
           </div>
           <h2>{targetUnlocked ? target.name : '神秘盲盒'}</h2>
           <p>
