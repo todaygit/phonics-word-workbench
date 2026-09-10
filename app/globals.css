@@ -2875,6 +2875,7 @@ button {
 .letter-keyboard button:disabled { opacity: .5; }
 .letter-keyboard-delete { margin: 10px auto 0; min-width: 150px; min-height: 48px; }
 .plan-entry-row { display:flex; justify-content:flex-end; margin-top:14px; }
+.test-center.is-setting-plan .spelling-launch-card { display:none; }
 .plan-entry-button { color:#fff !important; background:#e66a3c !important; border:1px solid #d65327 !important; border-radius:10px !important; opacity:1 !important; }
 .plan-save-row { display: flex; justify-content: flex-end; margin-top: 18px; }
 .challenge-choice-row { display: flex; gap: 12px; justify-content: center; }
