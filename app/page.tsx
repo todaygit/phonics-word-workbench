@@ -175,6 +175,8 @@ type QuizResult = {
 };
 
 const BANK_VERSION = 'v1.9';
+// 应用版本与词库版本分开，升级界面不会重置用户数据。
+const APP_VERSION = 'v1.9.2';
 const OLD_DEMO_IDS = new Set([
   'cat',
   'map',
@@ -1668,7 +1670,7 @@ function Workbench() {
             </div>
             <div>
               <strong>拼读小队</strong>
-              <small>英语学习工作台</small>
+              <small>英语学习工作台 · {APP_VERSION}</small>
             </div>
           </div>
         </SidebarHeader>
