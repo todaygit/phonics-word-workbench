@@ -504,10 +504,15 @@ function Workbench() {
 
   const requestSettings = useCallback(
     (target?: string) => {
+      if (!target) {
+        setTab('settings');
+        setParentOpen(false);
+        return;
+      }
       if (settingsUnlocked) {
         setTab('settings');
-        setParentOpen(Boolean(target));
-        if (target) setParentTab(target);
+        setParentOpen(true);
+        setParentTab(target);
         return;
       }
       setPinPurpose('settings');
@@ -2507,12 +2512,12 @@ function Workbench() {
             <InstallAppPanel />
             <button
               className="settings-entry"
-              onClick={() => setParentOpen(true)}
+              onClick={() => requestSettings('plan')}
             >
               <ShieldCheck />
               <span>
                 <strong>家长控制</strong>
-                <small>认词词库、拼写词库、语法题库、学习计划与备份</small>
+                <small>进入后需要密码，可管理词库、学习计划与备份</small>
               </span>
               <ChevronRight />
             </button>
