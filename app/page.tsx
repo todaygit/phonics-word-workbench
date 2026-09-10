@@ -176,7 +176,7 @@ type QuizResult = {
 
 const BANK_VERSION = 'v1.9';
 // 应用版本与词库版本分开，升级界面不会重置用户数据。
-const APP_VERSION = 'v1.9.6';
+const APP_VERSION = 'v1.9.7';
 const OLD_DEMO_IDS = new Set([
   'cat',
   'map',
@@ -1937,13 +1937,11 @@ function Workbench() {
                 <div className="spelling-launch-icon">
                   {testSetupUnlocked ? <Play /> : <LockKeyhole />}
                 </div>
-                <p className="eyebrow">
-                  {testSetupUnlocked ? "TODAY'S CHALLENGE" : 'PARENT SETUP'}
-                </p>
+                <p className="eyebrow">TODAY'S CHALLENGE</p>
                 <h2>
                   {testSetupUnlocked
                     ? '准备好开始挑战了吗？'
-                    : '请先由家长设置今天的测试'}
+                    : '今天的测试'}
                 </h2>
                 <p>
                   {testSetupUnlocked
