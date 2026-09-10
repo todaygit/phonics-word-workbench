@@ -176,7 +176,7 @@ type QuizResult = {
 
 const BANK_VERSION = 'v1.9';
 // 应用版本与词库版本分开，升级界面不会重置用户数据。
-const APP_VERSION = 'v1.9.3';
+const APP_VERSION = 'v1.9.4';
 const OLD_DEMO_IDS = new Set([
   'cat',
   'map',
@@ -1990,9 +1990,6 @@ function Workbench() {
                   </div>
                 )}
               </div>
-              <Button className="floating-plan-button" onClick={requestTestSetup}>
-                设置今日计划
-              </Button>
               <div className="test-quick-controls">
                 <button type="button" onClick={requestTestSetup}>
                   <BookMarked /> 测试范围
@@ -2394,6 +2391,11 @@ function Workbench() {
                 </div>
                 <Button variant="outline" onClick={() => setTab('mistakes')}>
                   查看错题记录
+                </Button>
+              </div>
+              <div className="plan-entry-row">
+                <Button className="plan-entry-button" onClick={requestTestSetup}>
+                  设置今日计划
                 </Button>
               </div>
             </section>
