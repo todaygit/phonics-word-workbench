@@ -176,7 +176,7 @@ type QuizResult = {
 
 const BANK_VERSION = 'v1.9';
 // 应用版本与词库版本分开，升级界面不会重置用户数据。
-const APP_VERSION = 'v1.9.8';
+const APP_VERSION = 'v1.9.9';
 const OLD_DEMO_IDS = new Set([
   'cat',
   'map',
@@ -2362,6 +2362,10 @@ function Workbench() {
                       </span>
                     </label>
                     <div className="plan-save-row">
+                      <div className="saved-plan-inline">
+                        <strong>已设置：{effectiveTestChapters.length} 个章节 · {launchCount} 题</strong>
+                        <small>{todayPlanReady ? '今日计划已保存' : '保存后孩子即可直接进入'}</small>
+                      </div>
                       <Button
                         className="primary-action"
                         onClick={() => {
@@ -2374,22 +2378,17 @@ function Workbench() {
                       >
                         保存今日计划
                       </Button>
+                      {todayPlanReady && (
+                        <Button variant="outline" onClick={() => {
+                          window.localStorage.removeItem('phonics.todayPlanSavedDate');
+                          setSavedPlanDate('');
+                          setQuizMessage('今日计划已删除。');
+                        }}>
+                          删除今日计划
+                        </Button>
+                      )}
                     </div>
                   </div>
-                </div>
-              )}
-              {!testSetupUnlocked && todayPlanReady && (
-                <div className="saved-plan-card panel">
-                  <div>
-                    <p className="eyebrow">TODAY'S PLAN</p>
-                    <h2>今日计划已设置</h2>
-                    <p>{effectiveTestChapters.length} 个章节 · {launchCount} 题 · {typeInfo[quizType].title}</p>
-                  </div>
-                  <Button variant="outline" onClick={() => {
-                    window.localStorage.removeItem('phonics.todayPlanSavedDate');
-                    setSavedPlanDate('');
-                    setQuizMessage('今日计划已删除。');
-                  }}>删除今日计划</Button>
                 </div>
               )}
               <div className="test-mistake-summary panel">
