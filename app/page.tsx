@@ -980,7 +980,8 @@ function Workbench() {
   ]);
 
   function buildQuiz(mode = quizMode, type = quizType) {
-    if (!testSetupUnlocked) {
+    // 已保存的今日计划可直接开始，只有尚未配置时才要求家长密码。
+    if (!testSetupUnlocked && !todayPlanReady) {
       requestTestSetup();
       return;
     }

@@ -2874,7 +2874,7 @@ button {
 .letter-keyboard button:hover:not(:disabled) { background: #e5f0ff; border-color: #79a9e8; }
 .letter-keyboard button:disabled { opacity: .5; }
 .letter-keyboard-delete { margin: 10px auto 0; min-width: 150px; min-height: 48px; }
-.floating-plan-button { position: fixed; right: 24px; bottom: 24px; z-index: 20; box-shadow: 0 8px 24px rgba(31, 65, 114, .18); }
+.floating-plan-button { position: fixed; right: 24px; bottom: 24px; z-index: 20; color: #fff !important; background: #e66a3c !important; border: 1px solid #d65327 !important; border-radius: 999px !important; box-shadow: 0 8px 24px rgba(31, 65, 114, .22); padding: 12px 22px; }
 .plan-save-row { display: flex; justify-content: flex-end; margin-top: 18px; }
 .challenge-choice-row { display: flex; gap: 12px; justify-content: center; }
 .challenge-choice-row > button { min-width: 170px; }
