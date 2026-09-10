@@ -779,6 +779,9 @@ function Workbench() {
               : 20,
           activeWords.length,
         );
+  const todayPlanReady =
+    testPlan.configuredDate === todayKey &&
+    (testPlan.selectedChapters.length > 0 || testPlan.selectedWordIds.length > 0);
 
   useEffect(() => {
     setWordPage(1);
@@ -1920,23 +1923,30 @@ function Workbench() {
                     ? `${modeInfo[quizMode].title} · ${typeInfo[quizType].title} · ${launchCount} 题`
                     : '测试范围、数量和拼写方式都由密码保护，孩子不能误改。'}
                 </p>
-                <Button
-                  className="primary-action"
-                  onClick={() =>
-                    testSetupUnlocked ? buildQuiz() : requestTestSetup()
-                  }
-                >
-                  {testSetupUnlocked ? <Play /> : <LockKeyhole />}
-                  {testSetupUnlocked ? '开始挑战' : '家长解锁设置'}
-                </Button>
-                {!testSetupUnlocked && (
-                  <div className="direct-challenge-block">
+                {testSetupUnlocked ? (
+                  <Button className="primary-action" onClick={() => buildQuiz()}>
+                    <Play /> 开始挑战
+                  </Button>
+                ) : (
+                  <div className="challenge-choice-row">
+                    <Button
+                      className="primary-action"
+                      disabled={!todayPlanReady}
+                      onClick={() => buildQuiz()}
+                      title={todayPlanReady ? '使用家长保存的今日计划' : '今日计划尚未设置'}
+                    >
+                      <Play /> 今日计划挑战
+                    </Button>
                     <Button
                       variant="outline"
                       onClick={() => setDirectChallengeOpen((open) => !open)}
                     >
-                      <Shuffle /> 直接挑战
+                      <Shuffle /> 随机挑战
                     </Button>
+                  </div>
+                )}
+                {!testSetupUnlocked && (
+                  <div className="direct-challenge-block">
                     {directChallengeOpen && (
                       <div className="direct-challenge-options">
                         <span>选择今天挑战数量：</span>

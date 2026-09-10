@@ -2868,18 +2868,27 @@ button {
 .meaning-prompt .word-audio-test { display: inline-flex; margin-left: 8px; vertical-align: middle; }
 .word-audio-test .word-audio-controls { display: inline-flex; }
 .word-audio-test .word-audio-controls button { border-radius: 999px; height: 34px; min-width: 34px; padding: 6px; }
-.letter-keyboard { display: grid; grid-template-columns: repeat(13, minmax(28px, 1fr)); gap: 6px; margin-top: 12px; }
-.letter-keyboard button { background: #f4f7fb; border: 1px solid #cbd8e7; border-radius: 8px; color: #172033; font-size: 15px; font-weight: 700; min-height: 38px; }
+.letter-keyboard { display: grid; grid-template-columns: repeat(7, minmax(48px, 1fr)); gap: 8px; margin-top: 14px; }
+.letter-keyboard button { align-items: center; background: #f4f7fb; border: 1px solid #cbd8e7; border-radius: 10px; color: #172033; display: flex; font-size: 17px; font-weight: 700; gap: 5px; justify-content: center; min-height: 48px; }
 .letter-keyboard button small { color: #49627e; font-size: 12px; font-weight: 500; }
 .letter-keyboard button:hover:not(:disabled) { background: #e5f0ff; border-color: #79a9e8; }
 .letter-keyboard button:disabled { opacity: .5; }
-.letter-keyboard-wide { grid-column: span 3; }
+.letter-keyboard-wide { grid-column: span 2; }
+.challenge-choice-row { display: flex; gap: 12px; justify-content: center; }
+.challenge-choice-row > button { min-width: 170px; }
 .answer-actions { align-items: stretch; display: flex; gap: 10px; }
 .answer-actions > button { flex: 1; min-height: 46px; }
 .quiz-word-details .meaning-prompt,
 .quiz-word-details .ipa-prompt { color: #405a78; font-size: 17px; line-height: 1.6; }
 .quiz-word-details .meaning-prompt b,
 .quiz-word-details .ipa-prompt b { color: #193a62; font-size: 15px; }
+@media (max-width: 520px) {
+  .letter-keyboard { gap: 5px; grid-template-columns: repeat(7, minmax(32px, 1fr)); }
+  .letter-keyboard button { font-size: 15px; min-height: 44px; }
+  .letter-keyboard button small { font-size: 11px; }
+  .challenge-choice-row { flex-direction: column; }
+  .challenge-choice-row > button { width: 100%; }
+}
 .audio-message {
   margin: 8px 0 0;
   font-size: 14px;
