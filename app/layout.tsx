@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: '拼读小队 · v1.9 拼写工作台',
+  title: '拼读小队 · v1.10.0',
   description:
     '按自然拼读学习顺序进行缺字母与全词拼写测试，并提供独立家长控制词库。',
   manifest: '/manifest.webmanifest',
