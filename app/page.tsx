@@ -275,6 +275,7 @@ function createMissingPrompt(
   count = 1,
   mode: MissingMode = 'random',
   phonics = '',
+  chapterTitle = '',
 ) {
   const letters = word.split('');
   const letterIndexes = letters
@@ -289,9 +290,16 @@ function createMissingPrompt(
     letterIndexes.slice(0, blankCount).forEach((index) => chosen.add(index));
   } else if (mode === 'phonics') {
     const chunks = phonics.match(/[a-z]+/gi)?.filter(Boolean) ?? [];
-    const chunk = chunks.find((item) =>
-      word.toLowerCase().includes(item.toLowerCase()),
-    );
+    const chapterKey = chapterTitle
+      .split('：')[0]
+      .replace(/^\s*\d+(?:\.\d+)?\s*/, '')
+      .replace(/short\s+/i, '')
+      .match(/[a-z]{1,5}/i)?.[0];
+    const chunk =
+      chunks.find(
+        (item) => chapterKey && item.toLowerCase() === chapterKey.toLowerCase(),
+      ) ??
+      chunks.find((item) => word.toLowerCase().includes(item.toLowerCase()));
     const start = chunk ? word.toLowerCase().indexOf(chunk.toLowerCase()) : -1;
     if (start >= 0) {
       letterIndexes
@@ -320,6 +328,37 @@ function maskExampleSentence(example: string, word: string) {
   if (!word.trim()) return example;
   const escaped = word.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return example.replace(new RegExp(`\\b${escaped}\\b`, 'gi'), '____');
+}
+
+function partOfSpeechLabel(value?: string) {
+  const raw = value?.trim() || '';
+  if (!raw) return '未填写';
+  const labels: Record<string, string> = {
+    n: '名词',
+    'n.': '名词',
+    v: '动词',
+    'v.': '动词',
+    adj: '形容词',
+    'adj.': '形容词',
+    adv: '副词',
+    'adv.': '副词',
+    pron: '代词',
+    'pron.': '代词',
+    prep: '介词',
+    'prep.': '介词',
+    conj: '连词',
+    'conj.': '连词',
+    aux: '助动词',
+    'aux.': '助动词',
+    modal: '情态动词',
+    func: '功能词',
+    'func.': '功能词',
+    num: '数词',
+    'num.': '数词',
+  };
+  const lower = raw.toLowerCase();
+  const translated = labels[lower];
+  return translated ? `${translated}（${raw}）` : raw;
 }
 
 function makeBlankWord(chapter: Chapter): Word {
@@ -717,6 +756,7 @@ function Workbench() {
         session?.missingCount ?? missingCount,
         session?.missingMode ?? missingMode,
         currentQuizWord.phonics,
+        chapters.find((item) => item.id === currentQuizWord.chapterId)?.title,
       )
     : null;
   const expectedAnswer = currentQuizWord
@@ -1442,16 +1482,19 @@ function Workbench() {
             <p className="ipa-prompt">
               <b>音标</b> {currentQuizWord.ipa || '暂无音标'}
             </p>
-            <p className="meaning-prompt">
-              <b>词性</b> {currentQuizWord.partOfSpeech || '未填写'}
-            </p>
-            <p className="meaning-prompt">
-              <b>拆分</b> {currentQuizWord.phonics || '未填写'}
-            </p>
-            <p className="meaning-prompt">
-              <b>例句</b>{' '}
-              {maskExampleSentence(currentQuizWord.example, currentQuizWord.word)}
-            </p>
+            {checked && (
+              <>
+                <p className="meaning-prompt">
+                  <b>词性</b> {partOfSpeechLabel(currentQuizWord.partOfSpeech)}
+                </p>
+                <p className="meaning-prompt">
+                  <b>拆分</b> {currentQuizWord.phonics || '未填写'}
+                </p>
+                <p className="meaning-prompt">
+                  <b>例句</b> {currentQuizWord.example || '暂无例句'}
+                </p>
+              </>
+            )}
           </div>
           {quizMessage && (
             <output className="notice-banner">{quizMessage}</output>
@@ -1555,7 +1598,7 @@ function Workbench() {
                 </span>
                 <span>
                   <b>词性</b>
-                  {currentQuizWord.partOfSpeech || '未填写'}
+                  {partOfSpeechLabel(currentQuizWord.partOfSpeech)}
                 </span>
                 <span>
                   <b>拆分</b>
@@ -1563,7 +1606,7 @@ function Workbench() {
                 </span>
                 <span>
                   <b>例句</b>
-                  {maskExampleSentence(currentQuizWord.example, currentQuizWord.word)}
+                  {currentQuizWord.example || '暂无例句'}
                 </span>
               </div>
               {scoreAward?.correct && (
