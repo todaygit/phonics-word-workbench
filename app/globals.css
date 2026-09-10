@@ -49,6 +49,19 @@ body {
 [data-slot='alert-dialog-overlay'] {
   background-color: #17203366 !important;
 }
+
+/* Native/select popovers need an opaque surface on tablets and translucent
+   browser themes, otherwise the options blend into the page behind them. */
+[data-slot='select-trigger'],
+[data-slot='select-content'],
+[data-slot='select-viewport'],
+[role='listbox'] {
+  background-color: #ffffff !important;
+  color: #172033;
+}
+[data-slot='select-trigger'] {
+  background-image: linear-gradient(180deg, #ffffff, #f4f8fc);
+}
 button,
 input,
 textarea {
@@ -2133,6 +2146,31 @@ button {
   font-size: 48px;
   line-height: 1.2;
 }
+
+.meadow-panel {
+  background: linear-gradient(180deg, #dff5e5 0%, #bce7c5 48%, #8ed39a 100%);
+  border: 1px solid #8dc99a;
+  border-radius: 24px;
+  min-height: 230px;
+  overflow: hidden;
+  padding: 20px;
+  position: relative;
+}
+.meadow-panel::after {
+  content: '✦  ✿  ✦  ✿  ✦';
+  color: #4a9b62;
+  font-size: 22px;
+  letter-spacing: 18px;
+  opacity: .55;
+  position: absolute;
+  right: 18px;
+  bottom: 14px;
+}
+.meadow-icons { align-items: end; display: flex; flex-wrap: wrap; gap: 14px; min-height: 150px; padding: 20px 8px 0; position: relative; z-index: 1; }
+.meadow-icons::before { content: '☀️'; font-size: 30px; position: absolute; right: 20px; top: 0; }
+.meadow-panel .forest-tree { background: #ffffffb8; border-color: #ffffffc7; }
+.meadow-panel .forest-tree em { font-size: 18px; font-style: normal; position: absolute; right: 6px; top: 2px; }
+.meadow-empty { align-self: center; color: #28643a; font-weight: 700; margin: 40px auto; }
 .forest-tree small {
   display: block;
   margin-top: 5px;
@@ -2827,6 +2865,14 @@ button {
 .word-audio-controls [data-slot='select-trigger'] {
   width: 145px;
 }
+.meaning-prompt .word-audio-test { display: inline-flex; margin-left: 8px; vertical-align: middle; }
+.word-audio-test .word-audio-controls { display: inline-flex; }
+.word-audio-test .word-audio-controls button { border-radius: 999px; height: 34px; min-width: 34px; padding: 6px; }
+.letter-keyboard { display: grid; grid-template-columns: repeat(13, minmax(28px, 1fr)); gap: 6px; margin-top: 12px; }
+.letter-keyboard button { background: #f4f7fb; border: 1px solid #cbd8e7; border-radius: 8px; color: #172033; font-size: 15px; font-weight: 700; min-height: 38px; }
+.letter-keyboard button:hover:not(:disabled) { background: #e5f0ff; border-color: #79a9e8; }
+.letter-keyboard button:disabled { opacity: .5; }
+.letter-keyboard-wide { grid-column: span 3; }
 .audio-message {
   margin: 8px 0 0;
   font-size: 14px;

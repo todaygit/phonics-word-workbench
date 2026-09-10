@@ -1427,20 +1427,20 @@ function Workbench() {
               {session.type === 'missing' ? '缺字母测试' : '全单词测试'}
             </span>
           </div>
-          <WordAudio
-            key={currentQuizWord.id}
-            word={currentQuizWord.word}
-            ipa={currentQuizWord.ipa}
-            preferredUrl={currentQuizWord.audioUrl}
-            autoPlay={settings.autoSpeak && !checked}
-            hideDetails
-          />
-          <p className="ipa-prompt">
-            <b>音标</b> {currentQuizWord.ipa || '暂无音标'}
-          </p>
           <div className="quiz-word-details">
             <p className="meaning-prompt">
               <b>中文</b> {currentQuizWord.meaning || '暂无释义'}
+              <WordAudio
+                key={currentQuizWord.id}
+                word={currentQuizWord.word}
+                ipa={currentQuizWord.ipa}
+                preferredUrl={currentQuizWord.audioUrl}
+                autoPlay={settings.autoSpeak && !checked}
+                hideDetails
+              />
+            </p>
+            <p className="ipa-prompt">
+              <b>音标</b> {currentQuizWord.ipa || '暂无音标'}
             </p>
             <p className="meaning-prompt">
               <b>词性</b> {currentQuizWord.partOfSpeech || '未填写'}
@@ -1491,6 +1491,26 @@ function Workbench() {
                   session.type === 'missing' ? '填入空缺字母' : '在这里拼写'
                 }
               />
+              <div className="letter-keyboard" aria-label="字母键盘">
+                {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map((letter) => (
+                  <button
+                    key={letter}
+                    type="button"
+                    onClick={() => setQuizInput((value) => value + letter.toLowerCase())}
+                    disabled={scoreBusy || Boolean(pendingScore.current)}
+                  >
+                    {letter}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  className="letter-keyboard-wide"
+                  onClick={() => setQuizInput((value) => value.slice(0, -1))}
+                  disabled={scoreBusy || Boolean(pendingScore.current) || !quizInput}
+                >
+                  ⌫ 删除
+                </button>
+              </div>
               <div className="answer-actions">
                 <Button
                   type="submit"

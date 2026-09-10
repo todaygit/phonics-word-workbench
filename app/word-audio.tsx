@@ -123,7 +123,14 @@ export function WordAudio({
   const choice = selectAudio(resources?.clips ?? [], localChoice, ipa);
   const selected = choice.clip;
   async function play() {
-    if (!selected || !resources || choice.ambiguous) return;
+    if (choice.ambiguous) return;
+    // GitHub Pages has no API proxy. When no dictionary clip is available,
+    // use the device's English voice instead of leaving the child with a dead
+    // audio button.
+    if (!selected || !resources) {
+      fallback();
+      return;
+    }
     stopWordAudio();
     const generation = playbackGeneration;
     const index = resources.clips.findIndex(
@@ -173,8 +180,7 @@ export function WordAudio({
   const playRef = useRef(play);
   playRef.current = play;
   useEffect(() => {
-    if (autoPlay && resources && !choice.ambiguous && selected)
-      void playRef.current();
+    if (autoPlay && resources && !choice.ambiguous) void playRef.current();
   }, [autoPlay, resources, choice.ambiguous, selected]);
   function fallback() {
     stopWordAudio();
@@ -199,12 +205,13 @@ export function WordAudio({
       <div className="word-audio-controls">
         <Button
           type="button"
-          disabled={loading || !selected || choice.ambiguous}
+          disabled={loading || choice.ambiguous}
           onClick={() => void play()}
+          aria-label="播放单词发音"
         >
-          <Volume2 /> {loading ? '匹配发音中…' : '听单词'}
+          <Volume2 /> {!hideDetails && (loading ? '匹配发音中…' : '听单词')}
         </Button>
-        <Select value={rate} onValueChange={(value) => value && setRate(value)}>
+        {!hideDetails && <Select value={rate} onValueChange={(value) => value && setRate(value)}>
           <SelectTrigger aria-label="发音速度">
             <SelectValue />
           </SelectTrigger>
@@ -212,9 +219,9 @@ export function WordAudio({
             <SelectItem value="1">正常速度</SelectItem>
             <SelectItem value="0.75">慢速 0.75×</SelectItem>
           </SelectContent>
-        </Select>
+        </Select>}
       </div>
-      {choice.ambiguous ? (
+      {!hideDetails && (choice.ambiguous ? (
         <p className="audio-message">
           这个词有不同读音，请先由家长在词库选定，避免听错音。
         </p>
@@ -227,8 +234,8 @@ export function WordAudio({
                 ? '正在寻找词典录音。'
                 : '没有匹配到可用词典录音。')}
         </p>
-      )}
-      {!choice.ambiguous && (
+      ))}
+      {!hideDetails && !choice.ambiguous && (
         <div className="audio-secondary">
           <Button type="button" variant="ghost" size="sm" onClick={fallback}>
             备用合成朗读

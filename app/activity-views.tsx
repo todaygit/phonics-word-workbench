@@ -192,6 +192,27 @@ export function RewardsView() {
           <span>今日登录</span>
         </div>
       </div>
+      <article className="meadow-panel" aria-label="我的草坪">
+        <div className="tree-shop-heading">
+          <div>
+            <h2>我的草坪</h2>
+            <p>每兑换一棵树，同时获得一件小装饰；同一种树可以反复种下。</p>
+          </div>
+          <span>{forest.planted.length} 棵树 · {forest.planted.length} 件装饰</span>
+        </div>
+        <div className="meadow-icons">
+          {forest.planted.length ? forest.planted.map((planted) => {
+            const species = TREE_CATALOG.find((tree) => tree.id === planted.treeId);
+            return (
+              <div className={`forest-tree tree-${species?.color ?? 'mint'}`} key={planted.id}>
+                <span aria-hidden="true">{species?.symbol ?? '🌳'}</span>
+                <small>{planted.treeName}</small>
+                <em aria-label="配套装饰">🎈</em>
+              </div>
+            );
+          }) : <p className="meadow-empty">还没有树，选一棵喜欢的种下吧 🌱</p>}
+        </div>
+      </article>
       <div className="tree-shop-heading">
         <div>
           <h2>选择下一棵树</h2>
@@ -318,35 +339,6 @@ export function RewardsView() {
                 <strong>{unlocked ? toy.name : `盲盒 #${index + 1}`}</strong>
                 <small>{unlocked ? toy.hint : `猜想：${toy.hint}`}</small>
                 <b>{unlocked ? '已解锁' : `${toy.unlockPoints} 分解锁`}</b>
-              </div>
-            );
-          })}
-        </div>
-      </article>
-      <article className="panel forest-panel">
-        <div>
-          <h2>我的小树林</h2>
-          <p>
-            {forest.planted.length
-              ? `已经种成 ${forest.planted.length} 棵树，继续选择下一棵吧。`
-              : '第一棵树长成后，会留在这里。'}
-          </p>
-        </div>
-        <div
-          className="forest-icons"
-          aria-label={`已种成 ${forest.planted.length} 棵树`}
-        >
-          {forest.planted.map((planted) => {
-            const species = TREE_CATALOG.find(
-              (tree) => tree.id === planted.treeId,
-            );
-            return (
-              <div
-                className={`forest-tree tree-${species?.color ?? 'mint'}`}
-                key={planted.id}
-              >
-                <span aria-hidden="true">{species?.symbol ?? '🌳'}</span>
-                <small>{planted.treeName}</small>
               </div>
             );
           })}
