@@ -34,6 +34,7 @@ import {
   BarChart3,
   Trash2,
   Upload,
+  UserRound,
   XCircle,
 } from 'lucide-react';
 import rawBank from './word-bank-v19.json';
@@ -156,6 +157,8 @@ type Settings = {
   defaultQuizType: QuizType;
   quizCount: number;
   autoSpeak: boolean;
+  learnerName: string;
+  avatar: string;
 };
 type QuizSession = {
   id: string;
@@ -235,6 +238,8 @@ const DEFAULT_SETTINGS: Settings = {
   defaultQuizType: 'missing',
   quizCount: 20,
   autoSpeak: false,
+  learnerName: '',
+  avatar: '🦊',
 };
 const DEFAULT_CHAPTERS = rawBank.chapters as Chapter[];
 const DEFAULT_WORDS: Word[] = rawBank.words.map((item) => ({
@@ -473,6 +478,29 @@ function Workbench() {
   );
   const importRef = useRef<HTMLInputElement>(null);
   const answerRef = useRef<HTMLInputElement>(null);
+  const avatarUploadRef = useRef<HTMLInputElement>(null);
+
+  const avatarOptions = ['🦊', '🐼', '🐰', '🐸', '🐯', '🦄', '🚀', '🌈'];
+
+  function handleAvatarUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setSettings((current) => ({ ...current, avatar: reader.result as string }));
+      }
+    };
+    reader.readAsDataURL(file);
+    event.target.value = '';
+  }
+
+  const learnerAvatar = settings.avatar?.startsWith('data:image/') ? (
+    <img src={settings.avatar} alt="" />
+  ) : (
+    <span>{settings.avatar || DEFAULT_SETTINGS.avatar}</span>
+  );
 
   const requestSettings = useCallback(
     (target?: string) => {
@@ -1740,6 +1768,10 @@ function Workbench() {
               <Flame /> 今天认出 {recognitionStats.day.knownIds.length} 词 ·
               拼写 {completedToday} 题
             </span>
+            <div className="learner-chip" title="可在设置中修改">
+              <span className="learner-avatar">{learnerAvatar}</span>
+              <span>{settings.learnerName || '学习小队员'}</span>
+            </div>
           </div>
         </header>
         <main className="workspace">
@@ -2422,6 +2454,56 @@ function Workbench() {
             hidden={tab !== 'settings' || parentOpen}
           >
             <h1>设置</h1>
+            <div className="profile-card">
+              <div className="profile-avatar">{learnerAvatar}</div>
+              <div className="profile-copy">
+                <span className="profile-kicker">我的学习资料</span>
+                <h2>{settings.learnerName || '给自己取个名字吧'}</h2>
+                <p>名字和头像只保存在这台设备上，用来让学习空间更像你。</p>
+                <div className="profile-name-row">
+                  <Input
+                    aria-label="使用人姓名"
+                    value={settings.learnerName}
+                    onChange={(event) =>
+                      setSettings((current) => ({
+                        ...current,
+                        learnerName: event.target.value.slice(0, 20),
+                      }))
+                    }
+                    placeholder="输入使用人的名字"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => avatarUploadRef.current?.click()}
+                  >
+                    <Upload /> 上传头像
+                  </Button>
+                  <input
+                    ref={avatarUploadRef}
+                    type="file"
+                    accept="image/*"
+                    hidden
+                    onChange={handleAvatarUpload}
+                  />
+                </div>
+                <div className="avatar-picker" aria-label="选择头像">
+                  {avatarOptions.map((avatar) => (
+                    <button
+                      key={avatar}
+                      type="button"
+                      className={settings.avatar === avatar ? 'selected' : ''}
+                      aria-label={`选择${avatar}头像`}
+                      aria-pressed={settings.avatar === avatar}
+                      onClick={() => setSettings((current) => ({ ...current, avatar }))}
+                    >
+                      {avatar}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <UserRound className="profile-icon" />
+            </div>
             <InstallAppPanel />
             <button
               className="settings-entry"
