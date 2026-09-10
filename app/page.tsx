@@ -176,7 +176,7 @@ type QuizResult = {
 
 const BANK_VERSION = 'v1.9';
 // 应用版本与词库版本分开，升级界面不会重置用户数据。
-const APP_VERSION = 'v1.9.5';
+const APP_VERSION = 'v1.9.6';
 const OLD_DEMO_IDS = new Set([
   'cat',
   'map',
@@ -1927,15 +1927,13 @@ function Workbench() {
                 <div>
                   <p className="eyebrow">SPELLING TEST</p>
                   <h1>拼写测试中心</h1>
-                  <p>
-                    家长先设置今天的范围和题数，孩子再点击中间的挑战卡开始。
-                  </p>
+                  <p>每天一点练习，今天也会有新的收获。</p>
                 </div>
               </div>
               {quizMessage && (
                 <div className="notice-banner">{quizMessage}</div>
               )}
-              <div className="spelling-launch-card panel">
+              {!testSetupUnlocked && <div className="spelling-launch-card panel">
                 <div className="spelling-launch-icon">
                   {testSetupUnlocked ? <Play /> : <LockKeyhole />}
                 </div>
@@ -1992,7 +1990,7 @@ function Workbench() {
                     )}
                   </div>
                 )}
-              </div>
+              </div>}
               <div className="test-quick-controls">
                 <button type="button" onClick={requestTestSetup}>
                   <BookMarked /> 测试范围
@@ -2380,6 +2378,20 @@ function Workbench() {
                       </Button>
                     </div>
                   </div>
+                </div>
+              )}
+              {!testSetupUnlocked && todayPlanReady && (
+                <div className="saved-plan-card panel">
+                  <div>
+                    <p className="eyebrow">TODAY'S PLAN</p>
+                    <h2>今日计划已设置</h2>
+                    <p>{effectiveTestChapters.length} 个章节 · {launchCount} 题 · {typeInfo[quizType].title}</p>
+                  </div>
+                  <Button variant="outline" onClick={() => {
+                    window.localStorage.removeItem('phonics.todayPlanSavedDate');
+                    setSavedPlanDate('');
+                    setQuizMessage('今日计划已删除。');
+                  }}>删除今日计划</Button>
                 </div>
               )}
               <div className="test-mistake-summary panel">
