@@ -176,7 +176,7 @@ type QuizResult = {
 
 const BANK_VERSION = 'v1.9';
 // 应用版本与词库版本分开，升级界面不会重置用户数据。
-const APP_VERSION = 'v1.9.4';
+const APP_VERSION = 'v1.9.5';
 const OLD_DEMO_IDS = new Set([
   'cat',
   'map',
@@ -434,6 +434,9 @@ function Workbench() {
   );
   const [wrongFirst, setWrongFirst] = useState(true);
   const [testPlan, setTestPlan] = useState<SpellingPlan>(EMPTY_SPELLING_PLAN);
+  const [savedPlanDate, setSavedPlanDate] = useState(() =>
+    typeof window === 'undefined' ? '' : window.localStorage.getItem('phonics.todayPlanSavedDate') ?? '',
+  );
   const [spellingStats, setSpellingStats] = useState<SpellingStats>({});
   const [testSetupUnlocked, setTestSetupUnlocked] = useState(false);
   const [pinPurpose, setPinPurpose] = useState<'settings' | 'test'>('settings');
@@ -805,7 +808,7 @@ function Workbench() {
           activeWords.length,
         );
   const todayPlanReady =
-    testPlan.configuredDate === todayKey &&
+    savedPlanDate === todayKey &&
     (testPlan.selectedChapters.length > 0 || testPlan.selectedWordIds.length > 0);
 
   useEffect(() => {
@@ -2367,6 +2370,8 @@ function Workbench() {
                         className="primary-action"
                         onClick={() => {
                           updateQuizPlan({ configuredDate: todayKey });
+                          window.localStorage.setItem('phonics.todayPlanSavedDate', todayKey);
+                          setSavedPlanDate(todayKey);
                           setTestSetupUnlocked(false);
                           setQuizMessage('今日计划已保存，可以开始挑战了。');
                         }}
