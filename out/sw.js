@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'phonics-workbench-v2';
+const CACHE_VERSION = 'phonics-workbench-v1.10.0';
 const APP_BASE = new URL('./', self.location.href).pathname;
 const APP_SHELL = [
   APP_BASE,
