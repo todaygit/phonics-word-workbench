@@ -241,6 +241,7 @@ const DEFAULT_SETTINGS: Settings = {
   learnerName: '',
   avatar: '🦊',
 };
+const AVATAR_OPTIONS = ['🦊', '🐼', '🐰', '🐸', '🐯', '🦄', '🚀', '🌈'];
 const DEFAULT_CHAPTERS = rawBank.chapters as Chapter[];
 const DEFAULT_WORDS: Word[] = rawBank.words.map((item) => ({
   ...item,
@@ -480,8 +481,6 @@ function Workbench() {
   const answerRef = useRef<HTMLInputElement>(null);
   const avatarUploadRef = useRef<HTMLInputElement>(null);
 
-  const avatarOptions = ['🦊', '🐼', '🐰', '🐸', '🐯', '🦄', '🚀', '🌈'];
-
   function handleAvatarUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -496,10 +495,14 @@ function Workbench() {
     event.target.value = '';
   }
 
-  const learnerAvatar = settings.avatar?.startsWith('data:image/') ? (
-    <img src={settings.avatar} alt="" />
+  const safeAvatar =
+    typeof settings.avatar === 'string' && settings.avatar.trim()
+      ? settings.avatar
+      : DEFAULT_SETTINGS.avatar;
+  const learnerAvatar = safeAvatar.startsWith('data:image/') ? (
+    <img src={safeAvatar} alt="" />
   ) : (
-    <span>{settings.avatar || DEFAULT_SETTINGS.avatar}</span>
+    <span>{safeAvatar}</span>
   );
 
   const requestSettings = useCallback(
@@ -597,9 +600,21 @@ function Workbench() {
       setChapters(DEFAULT_CHAPTERS);
       window.localStorage.setItem('phonics.bankVersion', BANK_VERSION);
     }
+    const storedSettings = loadStored<Partial<Settings>>(
+      'phonics.settings',
+      {},
+    );
     const mergedSettings = {
       ...DEFAULT_SETTINGS,
-      ...loadStored<Partial<Settings>>('phonics.settings', {}),
+      ...storedSettings,
+      learnerName:
+        typeof storedSettings.learnerName === 'string'
+          ? storedSettings.learnerName.slice(0, 20)
+          : DEFAULT_SETTINGS.learnerName,
+      avatar:
+        typeof storedSettings.avatar === 'string' && storedSettings.avatar.trim()
+          ? storedSettings.avatar
+          : DEFAULT_SETTINGS.avatar,
     };
     const safeQuizType: QuizType =
       mergedSettings.defaultQuizType === 'full' ? 'full' : 'missing';
@@ -2493,7 +2508,7 @@ function Workbench() {
                   />
                 </div>
                 <div className="avatar-picker" aria-label="选择头像">
-                  {avatarOptions.map((avatar) => (
+                  {AVATAR_OPTIONS.map((avatar) => (
                     <button
                       key={avatar}
                       type="button"

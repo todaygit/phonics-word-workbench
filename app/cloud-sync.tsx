@@ -27,7 +27,7 @@ const SESSION_KEY = 'phonics.cloud.session';
 const LAST_SYNC_KEY = 'phonics.cloud.lastSyncAt';
 const BEFORE_RESTORE_KEY = 'phonics.cloud.beforeCloudRestore';
 const LOCAL_BACKUPS_KEY = 'phonics.cloud.localBackups';
-const APP_URL = 'https://todaygit.github.io/phonics-word-workbench/';
+const APP_URL = 'https://phonics-word-workbench.pages.dev/';
 
 type CloudStatus =
   | 'signed-out'
@@ -400,8 +400,7 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
           window.localStorage.setItem(LAST_SYNC_KEY, remote.updated_at);
           fingerprintRef.current = snapshotFingerprint(remote.payload);
           setStatus('synced');
-          setMessage('已下载家庭云端记录，正在更新工作台…');
-          window.setTimeout(() => window.location.reload(), 250);
+          setMessage('已下载家庭云端记录。请刷新页面后加载最新记录。');
           return;
         }
         const localFingerprint = snapshotFingerprint(collectSnapshot());

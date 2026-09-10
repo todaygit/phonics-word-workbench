@@ -5,7 +5,7 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   root: 'github',
-  base: '/phonics-word-workbench/',
+  base: process.env.CLOUDFLARE_PAGES ? '/' : '/phonics-word-workbench/',
   publicDir: '../public',
   css: { postcss: { plugins: [tailwindcss()] } },
   define: {
