@@ -176,7 +176,7 @@ type QuizResult = {
 
 const BANK_VERSION = 'v1.9';
 // 应用版本与词库版本分开，升级界面不会重置用户数据。
-const APP_VERSION = 'v1.9.2';
+const APP_VERSION = 'v1.9.3';
 const OLD_DEMO_IDS = new Set([
   'cat',
   'map',
@@ -981,9 +981,9 @@ function Workbench() {
     words.length,
   ]);
 
-  function buildQuiz(mode = quizMode, type = quizType) {
+  function buildQuiz(mode = quizMode, type = quizType, allowSavedPlan = false) {
     // 已保存的今日计划可直接开始，只有尚未配置时才要求家长密码。
-    if (!testSetupUnlocked && !todayPlanReady) {
+    if (!testSetupUnlocked && !todayPlanReady && !allowSavedPlan) {
       requestTestSetup();
       return;
     }
@@ -1958,7 +1958,7 @@ function Workbench() {
                     <Button
                       className="primary-action"
                       disabled={!todayPlanReady}
-                      onClick={() => buildQuiz()}
+                      onClick={() => buildQuiz(quizMode, quizType, true)}
                       title={todayPlanReady ? '使用家长保存的今日计划' : '今日计划尚未设置'}
                     >
                       <Play /> 今日计划挑战
