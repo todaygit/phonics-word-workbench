@@ -197,6 +197,29 @@ function localDateKey(date = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
+const DAILY_ENCOURAGEMENTS = [
+  '今天也向前一步，你的努力正在发芽！',
+  '每拼对一个单词，都是给自己点亮一颗小星星。',
+  '慢慢来，认真读、认真想，你一定可以！',
+  '今天的你比昨天更棒，继续加油！',
+  '把声音读出来，单词就会记得更牢。',
+  '小小坚持，大大进步，开始挑战吧！',
+  '你已经学会很多了，再试一个看看！',
+  '认真完成今天的练习，给自己的树浇浇水。',
+  '每一次尝试都值得表扬，你真勇敢！',
+  '专注一会儿，收获一整天的成就感。',
+  '把不会的变成会的，就是最厉害的魔法。',
+  '你的进步看得见，今天也要闪闪发光！',
+  '读准音、写对词，你就是小小拼写家。',
+  '再坚持一下，新的小树和奖励在等你。',
+];
+
+function dailyEncouragement() {
+  const key = localDateKey();
+  const hash = key.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  return DAILY_ENCOURAGEMENTS[hash % DAILY_ENCOURAGEMENTS.length];
+}
+
 function addDays(days: number) {
   const date = new Date();
   date.setDate(date.getDate() + days);
@@ -1551,15 +1574,15 @@ function Workbench() {
                     {letter} <small>{letter.toLowerCase()}</small>
                   </button>
                 ))}
-                <button
-                  type="button"
-                  className="letter-keyboard-wide"
-                  onClick={() => setQuizInput((value) => value.slice(0, -1))}
-                  disabled={scoreBusy || Boolean(pendingScore.current) || !quizInput}
-                >
-                  ⌫ 删除
-                </button>
               </div>
+              <button
+                type="button"
+                className="letter-keyboard-delete"
+                onClick={() => setQuizInput((value) => value.slice(0, -1))}
+                disabled={scoreBusy || Boolean(pendingScore.current) || !quizInput}
+              >
+                ⌫ 删除
+              </button>
               <div className="answer-actions">
                 <Button
                   type="submit"
@@ -1921,7 +1944,7 @@ function Workbench() {
                 <p>
                   {testSetupUnlocked
                     ? `${modeInfo[quizMode].title} · ${typeInfo[quizType].title} · ${launchCount} 题`
-                    : '测试范围、数量和拼写方式都由密码保护，孩子不能误改。'}
+                    : dailyEncouragement()}
                 </p>
                 {testSetupUnlocked ? (
                   <Button className="primary-action" onClick={() => buildQuiz()}>
@@ -1964,6 +1987,9 @@ function Workbench() {
                   </div>
                 )}
               </div>
+              <Button className="floating-plan-button" onClick={requestTestSetup}>
+                设置今日计划
+              </Button>
               <div className="test-quick-controls">
                 <button type="button" onClick={requestTestSetup}>
                   <BookMarked /> 测试范围
@@ -2336,6 +2362,18 @@ function Workbench() {
                         <small>默认开启；错题仍按累计错误次数排序。</small>
                       </span>
                     </label>
+                    <div className="plan-save-row">
+                      <Button
+                        className="primary-action"
+                        onClick={() => {
+                          updateQuizPlan({ configuredDate: todayKey });
+                          setTestSetupUnlocked(false);
+                          setQuizMessage('今日计划已保存，可以开始挑战了。');
+                        }}
+                      >
+                        保存今日计划
+                      </Button>
+                    </div>
                   </div>
                 </div>
               )}
