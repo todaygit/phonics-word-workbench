@@ -1482,16 +1482,19 @@ function Workbench() {
             <p className="ipa-prompt">
               <b>音标</b> {currentQuizWord.ipa || '暂无音标'}
             </p>
+            <p className="meaning-prompt">
+              <b>词性</b> {partOfSpeechLabel(currentQuizWord.partOfSpeech)}
+            </p>
+            <p className="meaning-prompt">
+              <b>例句</b>{' '}
+              {checked
+                ? currentQuizWord.example || '暂无例句'
+                : maskExampleSentence(currentQuizWord.example, currentQuizWord.word)}
+            </p>
             {checked && (
               <>
                 <p className="meaning-prompt">
-                  <b>词性</b> {partOfSpeechLabel(currentQuizWord.partOfSpeech)}
-                </p>
-                <p className="meaning-prompt">
                   <b>拆分</b> {currentQuizWord.phonics || '未填写'}
-                </p>
-                <p className="meaning-prompt">
-                  <b>例句</b> {currentQuizWord.example || '暂无例句'}
                 </p>
               </>
             )}
@@ -1542,7 +1545,7 @@ function Workbench() {
                     onClick={() => setQuizInput((value) => value + letter.toLowerCase())}
                     disabled={scoreBusy || Boolean(pendingScore.current)}
                   >
-                    {letter}
+                    {letter} <small>{letter.toLowerCase()}</small>
                   </button>
                 ))}
                 <button
